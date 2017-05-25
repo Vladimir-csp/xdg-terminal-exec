@@ -9,6 +9,12 @@
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version. See <http://www.gnu.org/licenses/>.
 
+# some transitional variables for desktop entries used here:
+# ENTRY_FILE - desktop entry path relative to it's data directory
+# ENTRY_ID - ENTRY_FILE with '/' swapped for '-' (see section E of Desktop Entry Spec)
+# ENTRY_PATH - full path of specific desktop entry file
+
+
 DATA_PREFIX_DIR=xdg-terminals
 CONFIG_NAME=xdg-terminals.list
 
@@ -58,32 +64,51 @@ generate_config_list(){
 
 
 find_preferred_entry(){
-	local CONFIG_FILE
-	debug "finding preferred entry in configs"
+	local CONFIG_FILE=
+	local ENTRY_ID=
+	local SKIP=
+	local CONFIG_LIST="$(generate_config_list)"
 	
-	generate_config_list | while read CONFIG_FILE
+	debug "finding preferred entry in configs"
+
+	while read CONFIG_FILE
 	do
-		debug "looking for \"${CONFIG_FILE}\""
+		debug "looking for config \"${CONFIG_FILE}\""
 		if [ -f "${CONFIG_FILE}" ]
 		then
-			debug "reading \"${CONFIG_FILE}\""
-			cat "${CONFIG_FILE}" 2>/dev/null | while read LINE
+			debug "reading config \"${CONFIG_FILE}\""
+			while read LINE
 			do
 				debug "parsing line \"$LINE\""
 				LINE="$(trim_spaces "$(trim_comment "$LINE")")"
-				[ -z "$LINE" ] && continue
-				debug "retrieved string \"$LINE\""
-				ENTRY_FILE="$(find_entry_file "$LINE")"
-				[ -z "$ENTRY_FILE" ] && continue
-				debug "found valid entry file \"$ENTRY_FILE\""
-				printf "%s" "$ENTRY_FILE"
-				return 0
-			done
+				[ -z "$LINE" ] && continue || ENTRY_ID="$LINE"
+				debug "retrieved entry ID \"$ENTRY_ID\""
+				check_entry_id "$ENTRY_ID" || continue
+				
+				debug "finding path for entry ID \"$ENTRY_ID\""
+				ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
+				if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"
+				then
+					debug "file at path \"$ENTRY_PATH\" checks out"
+					printf "%s" "$ENTRY_PATH"
+					return 0
+				else
+					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
+					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
+					continue
+				fi
+			done < "${CONFIG_FILE}"
 		fi
-	done
+	done << EOF
+$CONFIG_LIST
+EOF
+
 }
 
 find_any_entry(){
+	local ENTRY_ID
+	local ENTRY_PATH
+	local ENTRY_FILES
 	debug "looking for first available entry in data hierarchy"
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
@@ -92,75 +117,100 @@ find_any_entry(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" | while read ENTRY_FILE
+			ENTRY_FILES="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
+			while read ENTRY_FILE
 			do
-				ENTRY="$(basename "$ENTRY_FILE")"
-				if check_entry_file "$ENTRY_FILE"
+				ENTRY_ID="$(printf "%s" "$ENTRY_FILE" | tr '/' '-')"
+				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/$ENTRY_FILE"
+				check_entry_id "$ENTRY_ID" || continue
+				if check_entry_path "$ENTRY_PATH"
 				then
-					debug "file \"$ENTRY_FILE\" checks out"
-					printf "%s" "$ENTRY_FILE"
+					debug "file at path \"$ENTRY_PATH\" checks out"
+					printf "%s" "$ENTRY_PATH"
 					return 0
 				else
-					debug "file \"$ENTRY_FILE\" failed check"
-					debug "stopped looking for entry \"$ENTRY\""
-					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY"
+					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
+					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
+					debug "current blacklist: \"$BLACKLIST\""
 					return 1
 				fi
-			done
+			done << EOF
+$ENTRY_FILES
+EOF
 		fi
 	done
 	IFS=$OIFS
 }
 
-find_entry_file(){
-	local ENTRY
-	ENTRY="$1"
-	debug "looking for entry \"$ENTRY\" in data heirarchy"
+enumerate_entries_in_dir(){
+	local DATA_DIR
+	local FILE_LIST
+	local ID_LIST
+	DATA_DIR="$1"
+	FILE_LIST="$(find "$DATA_DIR" -type f -iname "*.desktop" -printf "%P\n")"
+	ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
+}
+
+find_entry_path(){
+	local ENTRY_ID="$1"
+	local ENTRY_FILE
+	local ENTRY_PATH
+	local DATA_DIR
+	local FILE_LIST
+	local ID_LIST
+	local ID_NUM
+
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
 	do
 		IFS=$OIFS
-		debug "looking for file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\""
-		if [ -f "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}" ]
+		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
-			debug "found file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\""
-			if check_entry_file "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
-			then
-				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" checks out"
-				printf "%s" "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
-				return 0
-			else
-				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" failed check"
-				debug "stopped looking for entry \"$ENTRY\""
-				BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_FILE"
-				return 1
-			fi
+			debug "looking in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
+			FILE_LIST="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
+			ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
+			ID_NUM="$(printf "%s" "$ID_LIST" | grep -n "^${ENTRY_ID}$" | head -n 1 | cut -d : -f 1)"
+			ENTRY_FILE="$(printf "%s" "$FILE_LIST" | head -n "${ID_NUM:-0}" | tail -n 1)"
+			[ -n "$ENTRY_FILE" ] && ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY_FILE}" || continue
+			debug "got entry path \"$ENTRY_PATH\""
+			printf "%s" "$ENTRY_PATH"
+			return 0
 		fi
 	done
 	IFS=$OIFS
+	debug "path not found for entry ID \"$ENTRY_ID\""
+	return 1
 }
 
+check_entry_id(){
+	local ENTRY_ID="$1"
+		
+	debug "checking if ID \"$ENTRY_ID\" is in blacklist \"$BLACKLIST\""
+	IFS=';'
+	for ITEM in $BLACKLIST
+	do
+		IFS=$OIFS
+		if [ "$ENTRY_ID" = "$ITEM" ]
+		then
+			debug "blacklist positive"
+			return 1
+		fi
+	done
+	IFS=$OIFS
+	return 0
+}
 
-
-check_entry_file(){
+check_entry_path(){
+	local ENTRY_PATH="$1"
 	local DATA
-	local ENTRY_FILE
 	local TRYEXEC
 	local NOTSHOWIN
 	local ONLYSHOWIN
 	local HIDDEN
 	local FAIL
 	
-	ENTRY_FILE="$1"
-	DATA="$(cat "$ENTRY_FILE")"
-	
-	debug "checking if in cycle blacklist"
-	IFS=';'
-	for ITEM in $BLACKLIST
-	do
-		IFS=$OIFS
-		[ "$(basename "$ENTRY_FILE")" = "$ITEM" ] && return 1
-	done
+	ENTRY_PATH="$1"
+	DATA="$(cat "$ENTRY_PATH")"
 	
 	debug "checking TryExec"
 	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
@@ -178,8 +228,13 @@ check_entry_file(){
 	IFS=';'
 	for ITEM in $NOTSHOWIN
 	do
-		IFS=$OIFS
-		[ "$XDG_CURRENT_DESKTOP" = "$ITEM" ] && return 1
+		IFS=:
+		for DESKTOP in $XDG_CURRENT_DESKTOP
+		do
+			IFS=$OIFS
+			debug "checking NotShowIn against \"$DESKTOP\"=\"$ITEM\""
+			[ "$DESKTOP" = "$ITEM" ] && return 1
+		done
 	done
 	IFS=$OIFS
 	
@@ -189,9 +244,15 @@ check_entry_file(){
 	IFS=';'
 	for ITEM in $ONLYSHOWIN
 	do
-		IFS=$OIFS
 		FAIL=1
-		[ "$XDG_CURRENT_DESKTOP" = "$ITEM" ] && { FAIL=0 ; break ; }
+		IFS=:
+		for DESKTOP in $XDG_CURRENT_DESKTOP
+		do
+			IFS=$OIFS
+			debug "checking OnlyShowIn against \"$DESKTOP\"=\"$ITEM\""
+			[ "$DESKTOP" = "$ITEM" ] && { FAIL=0 ; break ; }
+		done
+		[ "$FAIL" = "0" ] && break
 	done
 	IFS=$OIFS
 	[ "$FAIL" = "1" ] && return 1
@@ -200,16 +261,17 @@ check_entry_file(){
 }
 
 
-ENTRY_FILE="$(find_preferred_entry)"
-[ -z "$ENTRY_FILE" ] && ENTRY_FILE="$(find_any_entry)"
+ENTRY_PATH="$(find_preferred_entry)"
+[ -z "$ENTRY_PATH" ] && ENTRY_PATH="$(find_any_entry)"
 
-if [ -n "$ENTRY_FILE" ]
+if [ -n "$ENTRY_PATH" ]
 then
-	EXEC="$(trim_spaces "$(grep '^[[:space:]]*Exec[[:space:]]*=' "$ENTRY_FILE" | head -n 1 | cut -d = -f 2-)")"
+	EXEC="$(trim_spaces "$(grep '^[[:space:]]*Exec[[:space:]]*=' "$ENTRY_PATH" | head -n 1 | cut -d = -f 2-)")"
 else
 	EXEC="xterm -e"
 fi
 
 debug "EXEC=$EXEC"
+[ "$DEBUG" = "1" ] && exit 0
 
 exec $EXEC "$@"
