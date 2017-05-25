@@ -40,23 +40,39 @@ trim_comment(){
 	printf "%s" "$TRIMVAR"
 }
 
-find_preferred_entry(){
-	local EXEC
-	debug "finding preferred entry in configs"
+generate_config_list(){
+	local DESKTOPS_LC
 	IFS=":"
+	DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
+	debug "lower case desktops are: \"${DESKTOPS_LC}\""
 	for CONFIG_DIR in $CONF_HIERARCHY
 	do
-		IFS=$OIFS
-		debug "looking for config in \"$CONFIG_DIR\""
-		if [ -f "${CONFIG_DIR}/${CONFIG_NAME}" -o -f "${CONFIG_DIR}/${XDG_SESSION_DESKTOP}-${CONFIG_NAME}" ]
+		for DESKTOP in $DESKTOPS_LC
+		do
+			printf "%s\n" "${CONFIG_DIR}/${DESKTOP}${DESKTOP:+-}${CONFIG_NAME}"
+		done
+		printf "%s\n" "${CONFIG_DIR}/${CONFIG_NAME}"
+	done | uniq
+	IFS=$OIFS
+}
+
+
+find_preferred_entry(){
+	local CONFIG_FILE
+	debug "finding preferred entry in configs"
+	
+	generate_config_list | while read CONFIG_FILE
+	do
+		debug "looking for \"${CONFIG_FILE}\""
+		if [ -f "${CONFIG_FILE}" ]
 		then
-			debug "looking in \"${CONFIG_DIR}/${CONFIG_NAME}\""
-			cat "${CONFIG_DIR}/${XDG_SESSION_DESKTOP}-${CONFIG_NAME}" "${CONFIG_DIR}/${CONFIG_NAME}" 2>/dev/null | while read LINE
+			debug "reading \"${CONFIG_FILE}\""
+			cat "${CONFIG_FILE}" 2>/dev/null | while read LINE
 			do
 				debug "parsing line \"$LINE\""
 				LINE="$(trim_spaces "$(trim_comment "$LINE")")"
 				[ -z "$LINE" ] && continue
-				debug "parsed line \"$LINE\""
+				debug "retrieved string \"$LINE\""
 				ENTRY_FILE="$(find_entry_file "$LINE")"
 				[ -z "$ENTRY_FILE" ] && continue
 				debug "found valid entry file \"$ENTRY_FILE\""
