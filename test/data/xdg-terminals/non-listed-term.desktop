@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+TryExec=testterm
+Exec=testterm non-listed-term
+Name=Non-listed term

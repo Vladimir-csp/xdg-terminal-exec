@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+TryExec=testterm
+Exec=testterm myde-term
+Name=MYDE specific terminal
+OnlyShowIn=MYDE

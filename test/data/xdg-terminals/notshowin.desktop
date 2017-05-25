@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+TryExec=testterm
+Exec=testterm notshowin
+Name=Not Show In
+NotShowIn=MYDE;MYDE2;MYDE3;MYDE4;
