@@ -142,15 +142,6 @@ EOF
 	IFS=$OIFS
 }
 
-enumerate_entries_in_dir(){
-	local DATA_DIR
-	local FILE_LIST
-	local ID_LIST
-	DATA_DIR="$1"
-	FILE_LIST="$(find "$DATA_DIR" -type f -iname "*.desktop" -printf "%P\n")"
-	ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
-}
-
 find_entry_path(){
 	local ENTRY_ID="$1"
 	local ENTRY_FILE
