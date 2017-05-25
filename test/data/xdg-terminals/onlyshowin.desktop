@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+TryExec=testterm
+Exec=testterm onlyshowin
+Name=Only Show In
+OnlyShowIn=MYDE2;

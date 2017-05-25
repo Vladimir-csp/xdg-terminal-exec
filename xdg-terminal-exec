@@ -67,7 +67,7 @@ find_preferred_entry(){
 		if [ -f "${CONFIG_FILE}" ]
 		then
 			debug "reading \"${CONFIG_FILE}\""
-			cat "${CONFIG_FILE}" 2>/dev/null | while read LINE
+			while read LINE
 			do
 				debug "parsing line \"$LINE\""
 				LINE="$(trim_spaces "$(trim_comment "$LINE")")"
@@ -78,7 +78,7 @@ find_preferred_entry(){
 				debug "found valid entry file \"$ENTRY_FILE\""
 				printf "%s" "$ENTRY_FILE"
 				return 0
-			done
+			done < "${CONFIG_FILE}" 2>/dev/null
 		fi
 	done
 }
@@ -92,9 +92,10 @@ find_any_entry(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" | while read ENTRY_FILE
+			desktopFiles=$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop")
+			while read ENTRY_FILE
 			do
-				ENTRY="$(basename "$ENTRY_FILE")"
+				local ENTRY="$(basename "$ENTRY_FILE")"
 				if check_entry_file "$ENTRY_FILE"
 				then
 					debug "file \"$ENTRY_FILE\" checks out"
@@ -104,9 +105,10 @@ find_any_entry(){
 					debug "file \"$ENTRY_FILE\" failed check"
 					debug "stopped looking for entry \"$ENTRY\""
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY"
-					return 1
 				fi
-			done
+			done << EOF
+$desktopFiles
+EOF
 		fi
 	done
 	IFS=$OIFS

@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+TryExec=testterm
+Exec=testterm hidden
+Name=Hidden entry
+Hidden=true
