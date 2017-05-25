@@ -1,0 +1,195 @@
+#!/bin/sh
+# Proposal for XDG terminal execution utility
+#
+# by Vladimir Kudrya
+# https://github.com/Vladimir-csp/
+#
+# This script is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version. See <http://www.gnu.org/licenses/>.
+
+DATA_PREFIX_DIR=xdg-terminals
+CONFIG_NAME=xdg-terminals.list
+
+DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+
+BLACKLIST=''
+ENTRY=''
+EXEC=''
+
+OIFS=$IFS
+
+debug(){
+	[ "$DEBUG" = "1" ] && printf "$1\n" >&2
+}
+
+trim_spaces(){
+	local TRIMVAR
+	TRIMVAR=$@
+	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
+	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
+	printf "$TRIMVAR"
+}
+
+trim_comment(){
+	local TRIMVAR
+	TRIMVAR=$@
+	TRIMVAR="${TRIMVAR%%#*}"
+	printf "$TRIMVAR"
+}
+
+find_preferred_entry(){
+	local EXEC
+	debug "finding preferred entry in configs"
+	IFS=":"
+	for CONFIG_DIR in $CONF_HIERARCHY
+	do
+		IFS=$OIFS
+		debug "looking for config in \"$CONFIG_DIR\""
+		if [ -f "${CONFIG_DIR}/${CONFIG_NAME}" -o -f "${CONFIG_DIR}/${XDG_SESSION_DESKTOP}-${CONFIG_NAME}" ]
+		then
+			debug "looking in \"${CONFIG_DIR}/${CONFIG_NAME}\""
+			cat "${CONFIG_DIR}/${XDG_SESSION_DESKTOP}-${CONFIG_NAME}" "${CONFIG_DIR}/${CONFIG_NAME}" 2>/dev/null | while read LINE
+			do
+				debug "parsing line \"$LINE\""
+				LINE="$(trim_spaces "$(trim_comment "$LINE")")"
+				[ -z "$LINE" ] && continue
+				debug "parsed line \"$LINE\""
+				ENTRY_FILE="$(find_entry_file "$LINE")"
+				[ -z "$ENTRY_FILE" ] && continue
+				debug "found valid entry file \"$ENTRY_FILE\""
+				printf "$ENTRY_FILE"
+				return 0
+			done
+		fi
+	done
+}
+
+find_any_entry(){
+	debug "looking for first available entry in data hierarchy"
+	IFS=$":"
+	for DATA_DIR in $DATA_HIERARCHY
+	do
+		IFS=$OIFS
+		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
+		then
+			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
+			find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" | while read ENTRY_FILE
+			do
+				ENTRY="$(basename "$ENTRY_FILE")"
+				if check_entry_file "$ENTRY_FILE"
+				then
+					debug "file \"$ENTRY_FILE\" checks out"
+					printf "$ENTRY_FILE"
+					return 0
+				else
+					debug "file \"$ENTRY_FILE\" failed check\nstopped looking for entry \"$ENTRY\""
+					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY"
+					return 1
+				fi
+			done
+		fi
+	done
+	IFS=$OIFS
+}
+
+find_entry_file(){
+	local ENTRY
+	ENTRY="$1"
+	debug "looking for entry \"$ENTRY\" in data heirarchy"
+	IFS=$":"
+	for DATA_DIR in $DATA_HIERARCHY
+	do
+		IFS=$OIFS
+		debug "looking for file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\""
+		if [ -f "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}" ]
+		then
+			debug "found file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\""
+			if check_entry_file "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
+			then
+				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" checks out"
+				printf "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
+				return 0
+			else
+				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" failed check\nstopped looking for entry \"$ENTRY\""
+				BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_FILE"
+				return 1
+			fi
+		fi
+	done
+	IFS=$OIFS
+}
+
+
+
+check_entry_file(){
+	local DATA
+	local ENTRY_FILE
+	local TRYEXEC
+	local NOTSHOWIN
+	local ONLYSHOWIN
+	local HIDDEN
+	local FAIL
+	
+	ENTRY_FILE="$1"
+	DATA="$(cat "$ENTRY_FILE")"
+	
+	debug "checking if in cycle blacklist"
+	IFS=';'
+	for ITEM in $BLACKLIST
+	do
+		IFS=$OIFS
+		[ "$(basename "$ENTRY_FILE")" = "$ITEM" ] && return 1
+	done
+	
+	debug "checking TryExec"
+	TRYEXEC="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	if [ -n "$TRYEXEC" ]
+	then
+		which "$TRYEXEC" || return 1
+	fi
+	
+	debug "checking Hidden"
+	HIDDEN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	[ "$HIDDEN" = "true" ] && return 1
+	
+	debug "checking NotShowIn"
+	NOTSHOWIN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	IFS=';'
+	for ITEM in $NOTSHOWIN
+	do
+		IFS=$OIFS
+		[ "$XDG_CURRENT_DESKTOP" = "$ITEM" ] && return 1
+	done
+	IFS=$OIFS
+	
+	debug "checking OnlyShowIn"
+	FAIL=0
+	ONLYSHOWIN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	IFS=';'
+	for ITEM in $ONLYSHOWIN
+	do
+		IFS=$OIFS
+		FAIL=1
+		[ "$XDG_CURRENT_DESKTOP" = "$ITEM" ] && { FAIL=0 ; break ; }
+	done
+	IFS=$OIFS
+	[ "$FAIL" = "1" ] && return 1
+
+	return 0
+}
+
+
+ENTRY_FILE="$(find_preferred_entry)"
+[ -z "$ENTRY_FILE" ] && ENTRY_FILE="$(find_any_entry)"
+
+if [ -n "$ENTRY_FILE" ]
+then
+	EXEC="$(trim_spaces "$(cat "$ENTRY_FILE" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+else
+	EXEC="xterm -e"
+fi
+
+exec $EXEC "$@"
