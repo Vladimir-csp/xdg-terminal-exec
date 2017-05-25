@@ -8,6 +8,9 @@
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version. See <http://www.gnu.org/licenses/>.
+#
+# Contributors:
+# Roman Chistokhodov https://github.com/FreeSlave/
 
 # some transitional variables for desktop entries used here:
 # ENTRY_FILE - desktop entry path relative to it's data directory
