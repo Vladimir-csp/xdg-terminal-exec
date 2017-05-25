@@ -22,22 +22,22 @@ EXEC=''
 OIFS=$IFS
 
 debug(){
-	[ "$DEBUG" = "1" ] && printf "$1\n" >&2
+	[ "$DEBUG" = "1" ] && printf "%s\n" "$1" >&2
 }
 
 trim_spaces(){
 	local TRIMVAR
-	TRIMVAR=$@
+	TRIMVAR=$*
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
 	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
-	printf "$TRIMVAR"
+	printf "%s" "$TRIMVAR"
 }
 
 trim_comment(){
 	local TRIMVAR
-	TRIMVAR=$@
+	TRIMVAR=$*
 	TRIMVAR="${TRIMVAR%%#*}"
-	printf "$TRIMVAR"
+	printf "%s" "$TRIMVAR"
 }
 
 find_preferred_entry(){
@@ -60,7 +60,7 @@ find_preferred_entry(){
 				ENTRY_FILE="$(find_entry_file "$LINE")"
 				[ -z "$ENTRY_FILE" ] && continue
 				debug "found valid entry file \"$ENTRY_FILE\""
-				printf "$ENTRY_FILE"
+				printf "%s" "$ENTRY_FILE"
 				return 0
 			done
 		fi
@@ -69,7 +69,7 @@ find_preferred_entry(){
 
 find_any_entry(){
 	debug "looking for first available entry in data hierarchy"
-	IFS=$":"
+	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
 	do
 		IFS=$OIFS
@@ -82,10 +82,11 @@ find_any_entry(){
 				if check_entry_file "$ENTRY_FILE"
 				then
 					debug "file \"$ENTRY_FILE\" checks out"
-					printf "$ENTRY_FILE"
+					printf "%s" "$ENTRY_FILE"
 					return 0
 				else
-					debug "file \"$ENTRY_FILE\" failed check\nstopped looking for entry \"$ENTRY\""
+					debug "file \"$ENTRY_FILE\" failed check"
+					debug "stopped looking for entry \"$ENTRY\""
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY"
 					return 1
 				fi
@@ -99,7 +100,7 @@ find_entry_file(){
 	local ENTRY
 	ENTRY="$1"
 	debug "looking for entry \"$ENTRY\" in data heirarchy"
-	IFS=$":"
+	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
 	do
 		IFS=$OIFS
@@ -110,10 +111,11 @@ find_entry_file(){
 			if check_entry_file "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
 			then
 				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" checks out"
-				printf "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
+				printf "%s" "${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}"
 				return 0
 			else
-				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" failed check\nstopped looking for entry \"$ENTRY\""
+				debug "file \"${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY}\" failed check"
+				debug "stopped looking for entry \"$ENTRY\""
 				BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_FILE"
 				return 1
 			fi
@@ -145,18 +147,18 @@ check_entry_file(){
 	done
 	
 	debug "checking TryExec"
-	TRYEXEC="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	if [ -n "$TRYEXEC" ]
 	then
 		which "$TRYEXEC" > /dev/null || return 1
 	fi
 	
 	debug "checking Hidden"
-	HIDDEN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	HIDDEN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	[ "$HIDDEN" = "true" ] && return 1
 	
 	debug "checking NotShowIn"
-	NOTSHOWIN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	NOTSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	IFS=';'
 	for ITEM in $NOTSHOWIN
 	do
@@ -167,7 +169,7 @@ check_entry_file(){
 	
 	debug "checking OnlyShowIn"
 	FAIL=0
-	ONLYSHOWIN="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	ONLYSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	IFS=';'
 	for ITEM in $ONLYSHOWIN
 	do
@@ -187,9 +189,11 @@ ENTRY_FILE="$(find_preferred_entry)"
 
 if [ -n "$ENTRY_FILE" ]
 then
-	EXEC="$(trim_spaces "$(cat "$ENTRY_FILE" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	EXEC="$(trim_spaces "$(grep '^[[:space:]]*Exec[[:space:]]*=' "$ENTRY_FILE" | head -n 1 | cut -d = -f 2-)")"
 else
 	EXEC="xterm -e"
 fi
+
+debug "EXEC=$EXEC"
 
 exec $EXEC "$@"
