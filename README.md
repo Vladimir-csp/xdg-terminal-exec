@@ -12,3 +12,12 @@ Format for config file is a a simple newline-separated list of desktop entries, 
     - each entry found in configs is checked for applicability and skipped if check fails.
   - If no valid entries were found in configs, every entry found in XDG_DATA hierarchy is checked in a row. Firs applicable will be used.
   - If above fails, `xterm -e`
+
+# syntax
+```
+xdg-terminal-exec command arguments
+```
+Run with `DEBUG=1` to see verbose messages to stderr.
+
+# limitations
+There is no mechanism for handling special quoting and arguments/strings that may be required for some terminals.
