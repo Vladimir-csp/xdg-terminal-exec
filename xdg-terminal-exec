@@ -130,7 +130,6 @@ find_any_entry(){
 					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
 					debug "current blacklist: \"$BLACKLIST\""
-					return 1
 				fi
 			done << EOF
 $ENTRY_FILES
