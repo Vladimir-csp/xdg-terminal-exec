@@ -1,14 +1,29 @@
 # xdg-terminal-exec
-Proposal for XDG terminal execution utility
+Proposal for XDG terminal execution utility and default terminal specification.
 
-Terminal emulators with their exec arguments are be described by desktop entries in directories named `xdg-terminals` placed in XDG_DATA hierarchy
+The configuration spec is crafted in image of [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html) using different names in similar structure.
 
-Preferred terminal is configured in config files named `xdg-terminals.list` placed in XDG_CONFIG hierarchy.
+Terminal emulators with their exec arguments are be described by desktop entries placed in directories named `xdg-terminals` provided via XDG_DATA hierarchy.
+
+Preferred terminal is configured in config files named `xdg-terminals.list` provided via XDG_CONFIG hierarchy.
 Format for config file is a a simple newline-separated list of desktop entries. #Comments, dangling whitespaces are trimmed.
+
+Paths are governed by [basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html) and by default are resolved into:
+- configs
+  - `$HOME/.config/$desktop-xdg-terminals.list`
+  - `$HOME/.config/xdg-terminals.list`
+  - `/etc/xdg/$desktop-xdg-terminals.list`
+  - `/etc/xdg/xdg-terminals.list`
+- data
+  - `$HOME/.local/share/xdg-terminals/`
+  - `/usr/local/share/xdg-terminals`
+  - `/usr/share/xdg-terminals`
+
+where `$desktop` is lowercase list of colon-separated names of current DE.
 
 ## Priority of selecting entry:
   - Read configs throughout XDG_CONFIG hierarchy.
-    - in each tier `${XDG_SESSION_DESKTOP}-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority
+    - in each tier `$desktop-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority
     - each entry found in configs is checked for applicability (same rules as in Desktop Entry Spec) and is skipped on failure.
   - If no valid entries were found among those marked in configs, every entry found in XDG_DATA hierarchy is checked in a row. First applicable will be used.
   - If all of the above fails, `xterm -e`
