@@ -148,7 +148,7 @@ check_entry_file(){
 	TRYEXEC="$(trim_spaces "$(printf "$DATA\n" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	if [ -n "$TRYEXEC" ]
 	then
-		which "$TRYEXEC" || return 1
+		which "$TRYEXEC" > /dev/null || return 1
 	fi
 	
 	debug "checking Hidden"
