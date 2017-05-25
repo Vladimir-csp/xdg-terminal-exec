@@ -1,14 +1,15 @@
 # xdg-terminal-exec
 Proposal for XDG terminal execution utility and default terminal specification.
 
-The configuration spec is crafted in image of [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html) using different names in similar structure.
+The configuration spec is crafted in image of [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html) using different names in similar structure, governed by [basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
 Terminal emulators with their exec arguments are be described by desktop entries placed in directories named `xdg-terminals` provided via XDG_DATA hierarchy.
 
 Preferred terminal is configured in config files named `xdg-terminals.list` provided via XDG_CONFIG hierarchy.
 Format for config file is a a simple newline-separated list of desktop entries. #Comments, dangling whitespaces are trimmed.
 
-Paths are governed by [basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html) and by default are resolved into:
+Default paths are resolved into:
+
 - configs
   - `$HOME/.config/$desktop-xdg-terminals.list`
   - `$HOME/.config/xdg-terminals.list`
