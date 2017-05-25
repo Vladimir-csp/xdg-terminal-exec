@@ -33,7 +33,7 @@ debug(){
 
 trim_spaces(){
 	local TRIMVAR
-	TRIMVAR=$*
+	TRIMVAR="$@"
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
 	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
 	printf "%s" "$TRIMVAR"
@@ -41,15 +41,14 @@ trim_spaces(){
 
 trim_comment(){
 	local TRIMVAR
-	TRIMVAR=$*
+	TRIMVAR="$@"
 	TRIMVAR="${TRIMVAR%%#*}"
 	printf "%s" "$TRIMVAR"
 }
 
 generate_config_list(){
-	local DESKTOPS_LC
+	local DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
 	IFS=":"
-	DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
 	debug "lower case desktops are: \"${DESKTOPS_LC}\""
 	for CONFIG_DIR in $CONF_HIERARCHY
 	do
@@ -64,7 +63,6 @@ generate_config_list(){
 
 
 find_preferred_entry(){
-	local CONFIG_FILE=
 	local ENTRY_ID=
 	local SKIP=
 	local CONFIG_LIST="$(generate_config_list)"
@@ -106,9 +104,9 @@ EOF
 }
 
 find_any_entry(){
-	local ENTRY_ID
-	local ENTRY_PATH
-	local ENTRY_FILES
+	local ENTRY_ID=
+	local ENTRY_PATH=
+	local ENTRY_FILES=
 	debug "looking for first available entry in data hierarchy"
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
@@ -144,12 +142,12 @@ EOF
 
 find_entry_path(){
 	local ENTRY_ID="$1"
-	local ENTRY_FILE
-	local ENTRY_PATH
-	local DATA_DIR
-	local FILE_LIST
-	local ID_LIST
-	local ID_NUM
+	local ENTRY_FILE=
+	local ENTRY_PATH=
+	local DATA_DIR=
+	local FILE_LIST=
+	local ID_LIST=
+	local ID_NUM=
 
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
@@ -193,15 +191,12 @@ check_entry_id(){
 
 check_entry_path(){
 	local ENTRY_PATH="$1"
-	local DATA
-	local TRYEXEC
-	local NOTSHOWIN
-	local ONLYSHOWIN
-	local HIDDEN
-	local FAIL
-	
-	ENTRY_PATH="$1"
-	DATA="$(cat "$ENTRY_PATH")"
+	local DATA="$(cat "$ENTRY_PATH")"
+	local TRYEXEC=
+	local NOTSHOWIN=
+	local ONLYSHOWIN=
+	local HIDDEN=
+	local FAIL=0
 	
 	debug "checking TryExec"
 	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
@@ -230,7 +225,6 @@ check_entry_path(){
 	IFS=$OIFS
 	
 	debug "checking OnlyShowIn"
-	FAIL=0
 	ONLYSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	IFS=';'
 	for ITEM in $ONLYSHOWIN
@@ -263,6 +257,6 @@ else
 fi
 
 debug "EXEC=$EXEC"
-[ "$DEBUG" = "1" ] && exit 0
+#[ "$DEBUG" = "1" ] && exit 0
 
 exec $EXEC "$@"
