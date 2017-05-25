@@ -2,6 +2,7 @@
 Proposal for XDG terminal execution utility
 
 Terminal emulators with their exec arguments are be described by desktop entries in directories named `xdg-terminals` placed in XDG_DATA hierarchy
+
 Preferred terminal is configured in config files named `xdg-terminals.list` placed in XDG_CONFIG hierarchy.
 Format for config file is a a simple newline-separated list of desktop entries, #comments, dangling whitespaces are trimmed.
 
