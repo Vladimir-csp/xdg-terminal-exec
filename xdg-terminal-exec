@@ -28,7 +28,7 @@ BLACKLIST=''
 ENTRY=''
 EXEC=''
 
-OIFS=$IFS
+OIFS="$IFS"
 
 debug(){
 	[ "$DEBUG" = "1" ] && printf "%s\n" "$1" >&2
@@ -61,7 +61,7 @@ generate_config_list(){
 		done
 		printf "%s\n" "${CONFIG_DIR}/${CONFIG_NAME}"
 	done | uniq
-	IFS=$OIFS
+	IFS="$OIFS"
 }
 
 
@@ -114,7 +114,7 @@ find_any_entry(){
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
 	do
-		IFS=$OIFS
+		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
@@ -139,7 +139,7 @@ $ENTRY_FILES
 EOF
 		fi
 	done
-	IFS=$OIFS
+	IFS="$OIFS"
 }
 
 find_entry_path(){
@@ -154,7 +154,7 @@ find_entry_path(){
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
 	do
-		IFS=$OIFS
+		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "looking in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
@@ -168,7 +168,7 @@ find_entry_path(){
 			return 0
 		fi
 	done
-	IFS=$OIFS
+	IFS="$OIFS"
 	debug "path not found for entry ID \"$ENTRY_ID\""
 	return 1
 }
@@ -180,14 +180,14 @@ check_entry_id(){
 	IFS=';'
 	for ITEM in $BLACKLIST
 	do
-		IFS=$OIFS
+		IFS="$OIFS"
 		if [ "$ENTRY_ID" = "$ITEM" ]
 		then
 			debug "blacklist positive"
 			return 1
 		fi
 	done
-	IFS=$OIFS
+	IFS="$OIFS"
 	return 0
 }
 
@@ -219,12 +219,12 @@ check_entry_path(){
 		IFS=:
 		for DESKTOP in $XDG_CURRENT_DESKTOP
 		do
-			IFS=$OIFS
+			IFS="$OIFS"
 			debug "checking NotShowIn against \"$DESKTOP\"=\"$ITEM\""
 			[ "$DESKTOP" = "$ITEM" ] && return 1
 		done
 	done
-	IFS=$OIFS
+	IFS="$OIFS"
 	
 	debug "checking OnlyShowIn"
 	ONLYSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
@@ -235,13 +235,13 @@ check_entry_path(){
 		IFS=:
 		for DESKTOP in $XDG_CURRENT_DESKTOP
 		do
-			IFS=$OIFS
+			IFS="$OIFS"
 			debug "checking OnlyShowIn against \"$DESKTOP\"=\"$ITEM\""
 			[ "$DESKTOP" = "$ITEM" ] && { FAIL=0 ; break ; }
 		done
 		[ "$FAIL" = "0" ] && break
 	done
-	IFS=$OIFS
+	IFS="$OIFS"
 	[ "$FAIL" = "1" ] && return 1
 
 	return 0
