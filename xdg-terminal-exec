@@ -24,9 +24,11 @@ CONFIG_NAME=xdg-terminals.list
 DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
 
+DATA=''
 BLACKLIST=''
 ENTRY=''
 EXEC=''
+EXECARG=''
 
 OIFS="$IFS"
 
@@ -50,6 +52,7 @@ trim_comment(){
 }
 
 generate_config_list(){
+	# Generate list of possible config files for current DE
 	local DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
 	IFS=":"
 	debug "lower case desktops are: \"${DESKTOPS_LC}\""
@@ -66,9 +69,12 @@ generate_config_list(){
 
 
 find_preferred_entry(){
+	# Read entries listed in config files until a valid one is found
 	local ENTRY_ID=
 	local SKIP=
-	local CONFIG_LIST="$(generate_config_list)"
+	local CONFIG_LIST=
+
+	CONFIG_LIST="$(generate_config_list)"
 	
 	debug "finding preferred entry in configs"
 
@@ -107,6 +113,7 @@ EOF
 }
 
 find_any_entry(){
+	# Read entries in data dirs until a valid one is found
 	local ENTRY_ID=
 	local ENTRY_PATH=
 	local ENTRY_FILES=
@@ -143,13 +150,16 @@ EOF
 }
 
 find_entry_path(){
-	local ENTRY_ID="$1"
+	# For given desktop entry ID find an actual file path
+	local ENTRY_ID=
 	local ENTRY_FILE=
 	local ENTRY_PATH=
 	local DATA_DIR=
 	local FILE_LIST=
 	local ID_LIST=
 	local ID_NUM=
+
+	ENTRY_ID="$1"
 
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
@@ -174,8 +184,10 @@ find_entry_path(){
 }
 
 check_entry_id(){
-	local ENTRY_ID="$1"
-		
+	# Check if entry ID is blacklisted by previous checks
+	local ENTRY_ID
+	ENTRY_ID="$1"
+
 	debug "checking if ID \"$ENTRY_ID\" is in blacklist \"$BLACKLIST\""
 	IFS=';'
 	for ITEM in $BLACKLIST
@@ -192,14 +204,18 @@ check_entry_id(){
 }
 
 check_entry_path(){
-	local ENTRY_PATH="$1"
-	local DATA="$(cat "$ENTRY_PATH")"
+	# Determine if entry in given path is valid for execution in current DE
+	local ENTRY_PATH=
+	local DATA=
 	local TRYEXEC=
 	local NOTSHOWIN=
 	local ONLYSHOWIN=
 	local HIDDEN=
 	local FAIL=0
-	
+
+	ENTRY_PATH="$1"
+	DATA="$(read_entry_path "$ENTRY_PATH")"
+
 	debug "checking TryExec"
 	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	if [ -n "$TRYEXEC" ]
@@ -243,8 +259,23 @@ check_entry_path(){
 	done
 	IFS="$OIFS"
 	[ "$FAIL" = "1" ] && return 1
-
+	debug "$TRYEXEC $NOTSHOWIN $ONLYSHOWIN $HIDDEN"
 	return 0
+}
+
+read_entry_path(){
+	# read entry, only "Desktop Entry" section
+	local ENTRY_PATH=
+	local DE="0"
+	ENTRY_PATH="$1"
+	while read LINE
+	do
+		if printf "%s" "$LINE" | grep -q "^[[:space:]]*\["
+		then
+			printf "%s" "$LINE" | grep -qi "^[[:space:]]*\[Desktop Entry\]" && DE=1 || DE=0
+		fi
+		[ "$DE" = "1" ] &&  printf "%s\n" "$LINE"
+	done < "${ENTRY_PATH}"
 }
 
 
@@ -253,12 +284,19 @@ ENTRY_PATH="$(find_preferred_entry)"
 
 if [ -n "$ENTRY_PATH" ]
 then
-	EXEC="$(trim_spaces "$(grep '^[[:space:]]*Exec[[:space:]]*=' "$ENTRY_PATH" | head -n 1 | cut -d = -f 2-)")"
+	DATA="$(read_entry_path "$ENTRY_PATH")"
+	EXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)" | { read first rest ; echo $first ; } )"
+	EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	[ -z "$EXECARG" ] && EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	[ -z "$EXECARG" ] && EXECARG="-e"
 else
-	EXEC="xterm -e"
+	EXEC="xterm"
+	EXECARG="-e"
 fi
 
 debug "EXEC=$EXEC"
+debug "EXECARG=$EXECARG"
+
 #[ "$DEBUG" = "1" ] && exit 0
 
-exec $EXEC "$@"
+exec $EXEC $EXECARG "$@"
