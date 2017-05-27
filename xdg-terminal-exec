@@ -259,7 +259,7 @@ check_entry_path(){
 	done
 	IFS="$OIFS"
 	[ "$FAIL" = "1" ] && return 1
-	debug "$TRYEXEC $NOTSHOWIN $ONLYSHOWIN $HIDDEN"
+
 	return 0
 }
 
@@ -286,9 +286,10 @@ if [ -n "$ENTRY_PATH" ]
 then
 	DATA="$(read_entry_path "$ENTRY_PATH")"
 	EXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)" | { read first rest ; echo $first ; } )"
-	EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
-	[ -z "$EXECARG" ] && EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
-	[ -z "$EXECARG" ] && EXECARG="-e"
+	EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)")"
+	[ -z "$EXECARG" ] && EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)")"
+	[ -z "$EXECARG" ] && EXECARG="ExecArg=-e"
+	EXECARG="$(trim_spaces "$(printf "%s\n" "$EXECARG" | cut -d = -f 2-)")"
 else
 	EXEC="xterm"
 	EXECARG="-e"
@@ -298,5 +299,9 @@ debug "EXEC=$EXEC"
 debug "EXECARG=$EXECARG"
 
 #[ "$DEBUG" = "1" ] && exit 0
-
-exec $EXEC $EXECARG "$@"
+if [ "$#" = "0" ]
+then
+	exec $EXEC
+else
+	exec $EXEC $EXECARG "$@"
+fi
