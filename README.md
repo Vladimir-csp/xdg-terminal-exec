@@ -29,6 +29,9 @@ where `$desktop` is lowercase list of colon-separated names of current DE.
   - If no valid entries were found among those marked in configs, every entry found in XDG_DATA hierarchy is checked in a row. First applicable will be used.
   - If all of the above fails, `xterm -e`
 
+## Desktop entry
+For defining terminals usual desktop entries may be used. The only addition is the key `X-ExecArg` which defines the exection argument for the terminal emulator. It defaults to `-e` if unset, but may be specifically set to an empty string.
+
 ## syntax
 ```
 xdg-terminal-exec command arguments
