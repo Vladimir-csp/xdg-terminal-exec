@@ -27,15 +27,16 @@ where `$desktop` is lowercase list of colon-separated names of current DE.
     - in each tier `$desktop-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority
     - each entry found in configs is checked for applicability (same rules as in Desktop Entry Spec) and is skipped on failure.
   - If no valid entries were found among those marked in configs, every entry found in XDG_DATA hierarchy is checked in a row. First applicable will be used.
-  - If all of the above fails, `xterm -e`
+  - If all of the above fails, `xterm` and `-e` are used.
 
-## Desktop entry
-For defining terminals usual desktop entries may be used. The only addition is the key `X-ExecArg` which defines the exection argument for the terminal emulator. It defaults to `-e` if unset, but may be specifically set to an empty string.
+## Desktop entry for terminal
+For defining terminals usual desktop entries may be used. The only addition is the key `X-ExecArg` which defines the exection argument for the terminal emulator. It defaults to `-e` if unset, but may be specifically set to an empty string. With this behavior stock entries for terminals that use `-e` as execution argument may be used unaltered.
 
 ## syntax
 ```
-xdg-terminal-exec command [arguments]
+xdg-terminal-exec [command [arguments]]
 ```
+If run without any arguments, only the terminal itself (first word of `Exec=`) will be launched. If command and its arguments are given, then values of both `Exec=` and `X-ExecArg=` will be used.
 Run with `DEBUG=1` to see verbose messages to stderr.
 
 ## limitations
