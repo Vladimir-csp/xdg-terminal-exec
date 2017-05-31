@@ -34,7 +34,7 @@ For defining terminals usual desktop entries may be used. The only addition is t
 
 ## syntax
 ```
-xdg-terminal-exec command arguments
+xdg-terminal-exec command [arguments]
 ```
 Run with `DEBUG=1` to see verbose messages to stderr.
 
