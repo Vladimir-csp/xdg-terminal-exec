@@ -285,7 +285,7 @@ ENTRY_PATH="$(find_preferred_entry)"
 if [ -n "$ENTRY_PATH" ]
 then
 	DATA="$(read_entry_path "$ENTRY_PATH")"
-	EXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)" | { read first rest ; echo $first ; } )"
+	EXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)")"
 	[ -z "$EXECARG" ] && EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)")"
 	[ -z "$EXECARG" ] && EXECARG="ExecArg=-e"
