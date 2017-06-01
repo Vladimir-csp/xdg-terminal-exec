@@ -36,7 +36,7 @@ For defining terminals usual desktop entries may be used. The only addition is t
 ```
 xdg-terminal-exec [command [arguments]]
 ```
-If run without any arguments, only the terminal itself (first word of `Exec=`) will be launched. If command and its arguments are given, then values of both `Exec=` and `X-ExecArg=` will be used.
+If run without any arguments, only the terminal itself (value of `Exec=`) will be launched. If command and its arguments are given, then values of both `Exec=` and `X-ExecArg=` will be used.
 Run with `DEBUG=1` to see verbose messages to stderr.
 
 ## limitations
