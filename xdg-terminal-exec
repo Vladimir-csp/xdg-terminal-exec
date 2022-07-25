@@ -168,7 +168,7 @@ find_entry_path(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "looking in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			FILE_LIST="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
+			FILE_LIST="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
 			ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
 			ID_NUM="$(printf "%s" "$ID_LIST" | grep -n "^${ENTRY_ID}$" | head -n 1 | cut -d : -f 1)"
 			ENTRY_FILE="$(printf "%s" "$FILE_LIST" | head -n "${ID_NUM:-0}" | tail -n 1)"
