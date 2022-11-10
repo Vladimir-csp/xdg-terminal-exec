@@ -1,11 +1,11 @@
 #!/bin/sh
 
-CURRENT_DIR=$(dirname -- $(readlink -f -- $0))
+CURRENT_DIR=$(dirname -- "$(readlink -f -- "$0")")
 export XDG_CONFIG_HOME="$CURRENT_DIR/config"
 export XDG_CONFIG_DIRS="$CURRENT_DIR/globalconfig"
 export XDG_DATA_HOME="$CURRENT_DIR/data"
 export XDG_DATA_DIRS="$CURRENT_DIR/globaldata"
-export PATH="$CURRENT_DIR/bin":$PATH
+export PATH="$CURRENT_DIR/bin:$PATH"
 
 XDG_TERMINAL_EXEC="sh $CURRENT_DIR/../xdg-terminal-exec"
 NOCONFIG="$CURRENT_DIR/no-config"
