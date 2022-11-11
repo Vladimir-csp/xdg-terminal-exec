@@ -14,7 +14,7 @@ xte() {
 }
 
 assert_output() {
-	[ "$output" = "$*" ]
+	[ "$output" = "${*:-$(cat)}" ]
 }
 
 @test "uses globally configured entry" {
@@ -143,4 +143,17 @@ assert_output() {
 	export XDG_CURRENT_DESKTOP=not
 	xte
 	assert_output "generic terminal"
+}
+
+@test "quotes commands and arguments correctly" {
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/quoting"
+	xte and 'custom arguments'
+	assert_output <<-'EOF'
+quoting terminal
+with 'complex' arguments
+and \"back\\slashes\"
+-e
+and
+custom arguments
+	EOF
 }
