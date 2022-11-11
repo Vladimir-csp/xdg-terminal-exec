@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=TryExec Fails
+Type=Application
+Exec=echo tryexec fails
+TryExec=executable-that-does-not-exist

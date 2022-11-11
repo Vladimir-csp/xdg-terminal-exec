@@ -1,0 +1,4 @@
+[Desktop Entry]
+Name=Default Terminal
+Type=Application
+Exec=echo default terminal

@@ -1,5 +1,0 @@
-[Desktop Entry]
-Type=Application
-TryExec=no-such-file
-Exec=testterm failed-tryexec
-Name=Failed TryExec

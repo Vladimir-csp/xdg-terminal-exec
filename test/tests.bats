@@ -2,47 +2,127 @@
 bats_require_minimum_version 1.5.0
 
 setup() {
-	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config"
-	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/globalconfig"
-	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data"
-	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/globaldata"
-	export PATH="$BATS_TEST_DIRNAME/bin:$PATH"
-	NOCONFIG="$BATS_TEST_DIRNAME/no-config"
-	NODATA="$BATS_TEST_DIRNAME/no-data"
-	XDG_TERMINAL_EXEC="$BATS_TEST_DIRNAME/../xdg-terminal-exec"
+	: "${XTE:=$BATS_TEST_DIRNAME/../xdg-terminal-exec}"
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/nothing"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/nothing"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/nothing"
 }
 
-@test "notshowin" {
-	XDG_CURRENT_DESKTOP=NODE run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "notshowin" ]
+xte() {
+	run -0 $XTE
 }
 
-@test "myde-term" {
-	XDG_CURRENT_DESKTOP=MYDE run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "myde-term" ]
+assert_output() {
+	[ "$output" = "$*" ]
 }
 
-@test "onlyshowin" {
-	XDG_CURRENT_DESKTOP=MYDE2 run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "onlyshowin" ]
+@test "uses globally configured entry" {
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
 }
 
-@test "global-term" {
-	XDG_CURRENT_DESKTOP=MYDE3 run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "global-term" ]
+@test "uses locally configured entry" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
 }
 
-@test "global-term no-config" {
-	XDG_CONFIG_HOME="$NOCONFIG" run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "global-term" ]
+@test "finds any global entry when there is no configuration" {
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
 }
 
-@test "non-listed-term" {
-	XDG_CURRENT_DESKTOP=MYDE4 XDG_CONFIG_HOME="$NOCONFIG" XDG_CONFIG_DIRS="$NOCONFIG" run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "non-listed-term" ]
+@test "finds any local entry when there is no configuration" {
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
 }
 
-@test "global-term myde4 no-config" {
-	XDG_CURRENT_DESKTOP=MYDE4 XDG_CONFIG_HOME="$NOCONFIG" XDG_CONFIG_DIRS="$NOCONFIG" XDG_DATA_HOME="$NODATA" run -0 $XDG_TERMINAL_EXEC
-	[ "$output" = "global-term" ]
+@test "prefers earlier configured entry" {
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/preferred:$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/preferred:$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "preferred terminal"
+}
+
+@test "prefers locally configured entry" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/preferred"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/preferred"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "preferred terminal"
+}
+
+@test "ignores hidden entry" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/hidden"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/hidden"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
+}
+
+@test "ignores entry when its TryExec fails" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/tryexec-fails"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/tryexec-fails"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte
+	assert_output "default terminal"
+}
+
+@test "uses desktop-specific configuration when available" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/lists"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/lists"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=desktop
+	xte
+	assert_output "specific terminal"
+}
+
+@test "uses desktop-agnostic configuration when none is available" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/lists"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/lists"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=other
+	xte
+	assert_output "generic terminal"
+}
+
+@test "considers entry when its OnlyShowIn matches" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=only
+	xte
+	assert_output "only terminal"
+}
+
+@test "considers entry when its NotShowIn does not match" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=other
+	xte
+	assert_output "not terminal"
+}
+
+@test "ignores entry when its NotShowIn matches or its OnlyShowIn does not match" {
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=not
+	xte
+	assert_output "generic terminal"
 }

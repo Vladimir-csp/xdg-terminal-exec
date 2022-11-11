@@ -1,0 +1,4 @@
+[Desktop Entry]
+Name=Specific Terminal
+Type=Application
+Exec=echo specific terminal
