@@ -10,7 +10,7 @@ setup() {
 }
 
 xte() {
-	run -0 $XTE
+	run -0 $XTE "$@"
 }
 
 assert_output() {
@@ -35,6 +35,18 @@ assert_output() {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	xte
 	assert_output "default terminal"
+}
+
+@test "uses configured exec arg" {
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/execarg"
+	xte argument
+	assert_output "execarg terminal -- argument"
+}
+
+@test "adds default exec arg" {
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	xte argument
+	assert_output "default terminal -e argument"
 }
 
 @test "deals with large desktop entries" {
