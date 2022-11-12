@@ -220,7 +220,7 @@ check_entry_path(){
 	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
 	if [ -n "$TRYEXEC" ]
 	then
-		which "$TRYEXEC" > /dev/null || return 1
+		command -v "$TRYEXEC" > /dev/null || return 1
 	fi
 	
 	debug "checking Hidden"
