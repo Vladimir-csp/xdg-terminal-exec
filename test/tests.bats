@@ -2,6 +2,7 @@
 
 setup() {
 	: "${XTE:=$BATS_TEST_DIRNAME/../xdg-terminal-exec}"
+	unset XDG_CURRENT_DESKTOP
 	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/nothing"
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/nothing"
