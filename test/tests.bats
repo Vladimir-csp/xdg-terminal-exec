@@ -34,6 +34,22 @@ assert_output() {
 	assert_output "default terminal"
 }
 
+@test "ignores missing config directory" {
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/missing:$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	run "$XTE"
+	assert_success
+	assert_output "default terminal"
+}
+
+@test "ignores missing data directory" {
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/missing:$BATS_TEST_DIRNAME/data/default"
+	run "$XTE"
+	assert_success
+	assert_output "default terminal"
+}
+
 @test "uses locally configured entry" {
 	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/default"
