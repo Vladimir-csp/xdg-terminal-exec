@@ -1,5 +1,4 @@
 #!/usr/bin/env bats
-bats_require_minimum_version 1.5.0
 
 setup() {
 	: "${XTE:=$BATS_TEST_DIRNAME/../xdg-terminal-exec}"
@@ -10,7 +9,16 @@ setup() {
 }
 
 xte() {
-	run -0 $XTE "$@"
+	run $XTE "$@"
+	assert_success
+}
+
+assert_success() {
+	[ "$status" -eq 0 ] || {
+		echo "status: $status" >&2
+		echo "output: $output" >&2
+		return 1
+	}
 }
 
 assert_output() {
