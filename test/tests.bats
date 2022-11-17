@@ -14,7 +14,13 @@ xte() {
 }
 
 assert_output() {
-	[ "$output" = "${*:-$(cat)}" ]
+	expected="${*:-$(cat)}"
+	[ "$output" = "$expected" ] || {
+		echo "status: $status" >&2
+		echo -n "output: " >&2
+		diff -u <(echo "$expected") <(echo "$output") >&2
+		return 1
+	}
 }
 
 @test "uses globally configured entry" {
