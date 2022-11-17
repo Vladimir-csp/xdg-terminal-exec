@@ -8,11 +8,6 @@ setup() {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/nothing"
 }
 
-xte() {
-	run $XTE "$@"
-	assert_success
-}
-
 assert_success() {
 	[ "$status" -eq 0 ] || {
 		echo "status: $status" >&2
@@ -34,51 +29,59 @@ assert_output() {
 @test "uses globally configured entry" {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
 @test "uses locally configured entry" {
 	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
 @test "finds any global entry when there is no configuration" {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
 @test "uses configured exec arg" {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/execarg"
-	xte argument
+	run "$XTE" argument
+	assert_success
 	assert_output "execarg terminal -- argument"
 }
 
 @test "adds default exec arg" {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte argument
+	run "$XTE" argument
+	assert_success
 	assert_output "default terminal -e argument"
 }
 
 @test "deals with large desktop entries" {
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/huge"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "huge terminal"
 }
 
 @test "finds any local entry when there is no configuration" {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
 @test "prefers earlier configured entry" {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/preferred:$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/preferred:$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "preferred terminal"
 }
 
@@ -87,7 +90,8 @@ assert_output() {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/preferred"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "preferred terminal"
 }
 
@@ -96,7 +100,8 @@ assert_output() {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/hidden"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
@@ -105,7 +110,8 @@ assert_output() {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/tryexec-fails"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "default terminal"
 }
 
@@ -115,7 +121,8 @@ assert_output() {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/lists"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=desktop
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "specific terminal"
 }
 
@@ -125,7 +132,8 @@ assert_output() {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/lists"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=other
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "generic terminal"
 }
 
@@ -135,7 +143,8 @@ assert_output() {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=only
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "only terminal"
 }
 
@@ -145,7 +154,8 @@ assert_output() {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=other
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "not terminal"
 }
 
@@ -155,13 +165,15 @@ assert_output() {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=not
-	xte
+	run "$XTE"
+	assert_success
 	assert_output "generic terminal"
 }
 
 @test "quotes commands and arguments correctly" {
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/quoting"
-	xte and 'custom arguments'
+	run "$XTE" and 'custom arguments'
+	assert_success
 	assert_output <<-'EOF'
 		quoting terminal
 		with 'complex' arguments
