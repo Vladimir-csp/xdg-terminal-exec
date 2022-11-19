@@ -21,7 +21,7 @@ assert_output() {
 	expected="${*:-$(cat)}"
 	[ "$output" = "$expected" ] || {
 		echo "status: $status" >&2
-		echo -n "output: " >&2
+		echo "output diff:" >&2
 		diff -u <(echo "$expected") <(echo "$output") >&2
 		return 1
 	}
