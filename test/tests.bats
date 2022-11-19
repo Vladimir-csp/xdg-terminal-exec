@@ -7,6 +7,7 @@ setup() {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/nothing"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/nothing"
+	export PATH="$BATS_TEST_DIRNAME/bin:$PATH"
 }
 
 assert_success() {
@@ -25,6 +26,12 @@ assert_output() {
 		diff -u <(echo "$expected") <(echo "$output") >&2
 		return 1
 	}
+}
+
+@test "uses xterm -e as the fallback" {
+	run "$XTE" argument
+	assert_success
+	assert_output "xterm -e argument"
 }
 
 @test "uses globally configured entry" {
