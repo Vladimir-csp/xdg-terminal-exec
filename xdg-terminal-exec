@@ -299,6 +299,11 @@ fi
 debug "EXEC=$EXEC"
 debug "EXECARG=$EXECARG"
 
+if ! command -v "$EXEC" &>/dev/null; then
+	>&2 printf "no terminal found\n"
+	exit 1
+fi
+
 #[ "$DEBUG" = "1" ] && exit 0
 if [ "$#" = "0" ]
 then
