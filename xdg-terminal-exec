@@ -128,6 +128,7 @@ find_any_entry(){
 			ENTRY_FILES="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
 			while read ENTRY_FILE
 			do
+				[ -z "$ENTRY_FILE" ] && continue
 				ENTRY_ID="$(printf "%s" "$ENTRY_FILE" | tr '/' '-')"
 				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/$ENTRY_FILE"
 				check_entry_id "$ENTRY_ID" || continue
