@@ -38,10 +38,17 @@ For defining terminals usual desktop entries may be used. The only addition is t
 ```
 xdg-terminal-exec [command [arguments]]
 ```
-If run without any arguments, only the terminal itself (value of `Exec=`) will be launched. If command and its arguments are given, then values of both `Exec=` and `X-ExecArg=` will be used.
+If run without any arguments, only the terminal itself (value of `Exec=`) will be launched.
+If command and its arguments are given, then values of both `Exec=` and `X-ExecArg=` will be used.
 Run with `DEBUG=1` to see verbose messages to stderr.
 
 ## limitations
-There is no mechanism for handling special quoting and arguments/strings that may be required for some terminals. Argument array is transmitted in the most preservable way possible: `"$@"`
+There is no mechanism for handling special quoting and arguments/strings that may be required for some terminals.
+Argument array is transmitted as is.
 
-At least when using xterm, command `xdg-terminal-exec nano "some file with spaces"\ and\ unquoted\ spaces second\ file` launches nano editing two files named `some file with spaces and unquoted spaces` and `second file`. And IMHO that is the golden standard, any terminal that fails to do so should be bugreported.
+At least when using xterm, command:
+```
+xdg-terminal-exec nano "some file with spaces"\ and\ unquoted\ spaces second\ file
+```
+launches nano editing two files named `some file with spaces and unquoted spaces` and `second file`.
+And IMHO that is the golden standard, any terminal that fails to do so should be bugreported.

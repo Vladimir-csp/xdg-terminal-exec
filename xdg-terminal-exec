@@ -38,7 +38,7 @@ debug(){
 
 trim_spaces(){
 	local TRIMVAR
-	TRIMVAR="$@"
+	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
 	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
 	printf "%s" "$TRIMVAR"
@@ -46,7 +46,7 @@ trim_spaces(){
 
 trim_comment(){
 	local TRIMVAR
-	TRIMVAR="$@"
+	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR%%#*}"
 	printf "%s" "$TRIMVAR"
 }
@@ -110,7 +110,6 @@ find_preferred_entry(){
 	done << EOF
 $CONFIG_LIST
 EOF
-
 }
 
 find_any_entry(){
@@ -300,6 +299,23 @@ args2zero() {
 	unset NOT_FIRST_ARG
 }
 
+construct_argv() {
+	# outputs zero-delimited full final argv list
+	if [ "$#" = "0" ]
+	then
+		printf '%s' "$EXEC" | execstring2zero
+	else
+		printf '%s' "$EXEC" | execstring2zero
+		if [ -n "$EXECARG" ]
+		then
+			printf '%b' '\0'
+			printf '%s' "$EXECARG"
+		fi
+		printf '%b' '\0'
+		args2zero "$@"
+	fi
+}
+
 ENTRY_PATH="$(find_preferred_entry)"
 [ -z "$ENTRY_PATH" ] && ENTRY_PATH="$(find_any_entry)"
 
@@ -316,15 +332,19 @@ then
 		EXECARG="$(trim_spaces "$EXECARG")"
 	fi
 	[ -z "$EXECARG" ] && EXECARG="ExecArg=-e"
-	EXECARG="$(trim_spaces "$(printf "%s\n" "$EXECARG" | cut -d = -f 2-)")"
+	EXECARG="$(printf "%s\n" "$EXECARG" | cut -d = -f 2-)"
+	EXECARG="$(trim_spaces "$EXECARG")"
 else
 	EXEC="xterm"
 	EXECARG="-e"
 fi
 
-debug "EXEC=$EXEC"
-debug "EXECARG=$EXECARG"
-debug "ARGV=$@"
+debug "EXEC=$EXEC
+EXECARG=$EXECARG
+ARGV=$*
+Final argv (per line):
+$(construct_argv "$@" | tr '\0' "\n")
+End of final argv"
 
 # this variant is robust, but spawns xargs process instead of clean exec
 #{
@@ -335,8 +355,11 @@ debug "ARGV=$@"
 #	else
 #		# grep adds zero byte at the end if anything was printed
 #		printf '%s' "$EXEC" | execstring2zero | tail -zn +2 | grep -z .
-#		printf '%s' "$EXECARG"
-#		printf '%b' '\0'
+#		if [ -n "$EXECARG" ]
+#		then
+#			printf '%s' "$EXECARG"
+#			printf '%b' '\0'
+#		fi
 #		args2zero "$@"
 #	fi
 #} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
@@ -345,7 +368,7 @@ debug "ARGV=$@"
 # use pseudographics to increase chances
 for CHAR in '│' '─' '■' '▒' '○' '┼' '║' '╟' '╢'
 do
-	if [ "$(printf '%s' "$EXEC $EXECARG $@")" = "$(printf '%s' "$EXEC $EXECARG $@" | tr -d "CHAR")" ]
+	if [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "CHAR")" ]
 	then
 		debug "IFS=$CHAR"
 		IFS="$CHAR"
@@ -355,14 +378,5 @@ done
 
 # feed exec a string, separated by chosen $IFS
 exec $(
-	if [ "$#" = "0" ]
-	then
-		printf '%s' "$EXEC" | execstring2zero
-	else
-		printf '%s' "$EXEC" | execstring2zero
-		printf '%b' '\0'
-		printf '%s' "$EXECARG"
-		printf '%b' '\0'
-		args2zero "$@"
-	fi | tr '\0' "$IFS"
+	construct_argv "$@" | tr '\0' "$IFS"
 )
