@@ -75,7 +75,7 @@ find_preferred_entry(){
 	local CONFIG_LIST=
 
 	CONFIG_LIST="$(generate_config_list)"
-	
+
 	debug "finding preferred entry in configs"
 
 	while read CONFIG_FILE
@@ -92,7 +92,7 @@ find_preferred_entry(){
 				[ -z "$LINE" ] && continue || ENTRY_ID="$LINE"
 				debug "retrieved entry ID \"$ENTRY_ID\""
 				check_entry_id "$ENTRY_ID" || continue
-				
+
 				debug "finding path for entry ID \"$ENTRY_ID\""
 				ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
 				if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"
@@ -128,6 +128,7 @@ find_any_entry(){
 			ENTRY_FILES="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
 			while read ENTRY_FILE
 			do
+				[ -z "$ENTRY_FILE" ] && continue
 				ENTRY_ID="$(printf "%s" "$ENTRY_FILE" | tr '/' '-')"
 				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/$ENTRY_FILE"
 				check_entry_id "$ENTRY_ID" || continue
@@ -208,6 +209,7 @@ check_entry_path(){
 	local ENTRY_PATH=
 	local DATA=
 	local TRYEXEC=
+	local EXEC0=
 	local NOTSHOWIN=
 	local ONLYSHOWIN=
 	local HIDDEN=
@@ -221,14 +223,35 @@ check_entry_path(){
 	TRYEXEC="$(trim_spaces "$TRYEXEC")"
 	if [ -n "$TRYEXEC" ]
 	then
-		command -v "$TRYEXEC" > /dev/null || return 1
+		debug "TryExec is defined"
+		if command -v "$TRYEXEC" > /dev/null
+		then
+			debug "TryExec command $TRYEXEC exists"
+		else
+			debug "TryExec command $TRYEXEC not found"
+			return 1
+		fi
+	else
+		debug "TryExec not defined"
 	fi
-	
+
+	debug "checking Exec[0]"
+	EXEC0="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	EXEC0="$(trim_spaces "$EXEC0")"
+	EXEC0="$(printf "%s" "$EXEC0" | execstring2zero | head -zn 1)"
+	if [ -n "$EXEC0" ] && command -v "$EXEC0" > /dev/null
+	then
+		debug "Exec[0] command $EXEC0 exists"
+	else
+		debug "Exec[0] command $EXEC0 not found"
+		return 1
+	fi
+
 	debug "checking Hidden"
 	HIDDEN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	HIDDEN="$(trim_spaces "$HIDDEN")"
 	[ "$HIDDEN" = "true" ] && return 1
-	
+
 	debug "checking NotShowIn"
 	NOTSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	NOTSHOWIN="$(trim_spaces "$NOTSHOWIN")"
@@ -244,7 +267,7 @@ check_entry_path(){
 		done
 	done
 	IFS="$OIFS"
-	
+
 	debug "checking OnlyShowIn"
 	ONLYSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	ONLYSHOWIN="$(trim_spaces "$ONLYSHOWIN")"
