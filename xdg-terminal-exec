@@ -284,20 +284,20 @@ read_entry_path(){
 }
 
 execstring2zero() {
-       # converts argument string from stdin to zero-delimited list
-       xargs sh -c 'NOT_FIRST_ARG=false ; for ARG in "$@" ; do [ "$NOT_FIRST_ARG" = "true" ] && printf "%b" "\0" ; printf "%s" "$ARG" ; NOT_FIRST_ARG=true ; done' arg-splitter
+	# converts argument string from stdin to zero-delimited list
+	xargs sh -c 'NOT_FIRST_ARG=false ; for ARG in "$@" ; do [ "$NOT_FIRST_ARG" = "true" ] && printf "%b" "\0" ; printf "%s" "$ARG" ; NOT_FIRST_ARG=true ; done' arg-splitter
 }
 
 args2zero() {
-       # converts argument array to zero-delimited list
-       NOT_FIRST_ARG=false
-       for ARG in "$@"
-       do
-               [ "$NOT_FIRST_ARG" = "true" ] && printf '%b' '\0'
-               printf '%s' "$ARG"
-               NOT_FIRST_ARG=true
-       done
-       unset NOT_FIRST_ARG
+	# converts argument array to zero-delimited list
+	NOT_FIRST_ARG=false
+	for ARG in "$@"
+	do
+		[ "$NOT_FIRST_ARG" = "true" ] && printf '%b' '\0'
+		printf '%s' "$ARG"
+		NOT_FIRST_ARG=true
+	done
+	unset NOT_FIRST_ARG
 }
 
 ENTRY_PATH="$(find_preferred_entry)"
@@ -324,17 +324,45 @@ fi
 
 debug "EXEC=$EXEC"
 debug "EXECARG=$EXECARG"
+debug "ARGV=$@"
 
-{
-       if [ "$#" = "0" ]
-       then
-               # prints out only arguments from Exec if any
-               printf '%s' "$EXEC" | execstring2zero | tail -zn +2
-       else
-               # grep adds zero byte at the end if anything was printed
-               printf '%s' "$EXEC" | execstring2zero | tail -zn +2 | grep -z .
-               printf '%s' "$EXECARG"
-               printf '%b' '\0'
-               args2zero "$@"
-       fi
-} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
+# this variant is robust, but spawns xargs process instead of clean exec
+#{
+#	if [ "$#" = "0" ]
+#	then
+#		# prints out only arguments from Exec if any
+#		printf '%s' "$EXEC" | execstring2zero | tail -zn +2
+#	else
+#		# grep adds zero byte at the end if anything was printed
+#		printf '%s' "$EXEC" | execstring2zero | tail -zn +2 | grep -z .
+#		printf '%s' "$EXECARG"
+#		printf '%b' '\0'
+#		args2zero "$@"
+#	fi
+#} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
+
+# choose a character for IFS that is not present in command line
+# use pseudographics to increase chances
+for CHAR in '│' '─' '■' '▒' '○' '┼' '║' '╟' '╢'
+do
+	if [ "$(printf '%s' "$EXEC $EXECARG $@")" = "$(printf '%s' "$EXEC $EXECARG $@" | tr -d "CHAR")" ]
+	then
+		debug "IFS=$CHAR"
+		IFS="$CHAR"
+		break
+	fi
+done
+
+# feed exec a string, separated by chosen $IFS
+exec $(
+	if [ "$#" = "0" ]
+	then
+		printf '%s' "$EXEC" | execstring2zero
+	else
+		printf '%s' "$EXEC" | execstring2zero
+		printf '%b' '\0'
+		printf '%s' "$EXECARG"
+		printf '%b' '\0'
+		args2zero "$@"
+	fi | tr '\0' "$IFS"
+)
