@@ -87,7 +87,8 @@ find_preferred_entry(){
 			while read LINE
 			do
 				debug "parsing line \"$LINE\""
-				LINE="$(trim_spaces "$(trim_comment "$LINE")")"
+				LINE="$(trim_comment "$LINE")"
+				LINE="$(trim_spaces "$LINE")"
 				[ -z "$LINE" ] && continue || ENTRY_ID="$LINE"
 				debug "retrieved entry ID \"$ENTRY_ID\""
 				check_entry_id "$ENTRY_ID" || continue
@@ -217,18 +218,21 @@ check_entry_path(){
 	DATA="$(read_entry_path "$ENTRY_PATH")"
 
 	debug "checking TryExec"
-	TRYEXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	TRYEXEC="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	TRYEXEC="$(trim_spaces "$TRYEXEC")"
 	if [ -n "$TRYEXEC" ]
 	then
 		command -v "$TRYEXEC" > /dev/null || return 1
 	fi
 	
 	debug "checking Hidden"
-	HIDDEN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	HIDDEN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	HIDDEN="$(trim_spaces "$HIDDEN")"
 	[ "$HIDDEN" = "true" ] && return 1
 	
 	debug "checking NotShowIn"
-	NOTSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	NOTSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	NOTSHOWIN="$(trim_spaces "$NOTSHOWIN")"
 	IFS=';'
 	for ITEM in $NOTSHOWIN
 	do
@@ -243,7 +247,8 @@ check_entry_path(){
 	IFS="$OIFS"
 	
 	debug "checking OnlyShowIn"
-	ONLYSHOWIN="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
+	ONLYSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	ONLYSHOWIN="$(trim_spaces "$ONLYSHOWIN")"
 	IFS=';'
 	for ITEM in $ONLYSHOWIN
 	do
@@ -268,7 +273,7 @@ read_entry_path(){
 	local ENTRY_PATH=
 	local DE="0"
 	ENTRY_PATH="$1"
-	while read LINE
+	while read -r LINE
 	do
 		if printf "%s" "$LINE" | grep -q "^[[:space:]]*\["
 		then
@@ -278,6 +283,22 @@ read_entry_path(){
 	done < "${ENTRY_PATH}"
 }
 
+execstring2zero() {
+       # converts argument string from stdin to zero-delimited list
+       xargs sh -c 'NOT_FIRST_ARG=false ; for ARG in "$@" ; do [ "$NOT_FIRST_ARG" = "true" ] && printf "%b" "\0" ; printf "%s" "$ARG" ; NOT_FIRST_ARG=true ; done' arg-splitter
+}
+
+args2zero() {
+       # converts argument array to zero-delimited list
+       NOT_FIRST_ARG=false
+       for ARG in "$@"
+       do
+               [ "$NOT_FIRST_ARG" = "true" ] && printf '%b' '\0'
+               printf '%s' "$ARG"
+               NOT_FIRST_ARG=true
+       done
+       unset NOT_FIRST_ARG
+}
 
 ENTRY_PATH="$(find_preferred_entry)"
 [ -z "$ENTRY_PATH" ] && ENTRY_PATH="$(find_any_entry)"
@@ -285,9 +306,15 @@ ENTRY_PATH="$(find_preferred_entry)"
 if [ -n "$ENTRY_PATH" ]
 then
 	DATA="$(read_entry_path "$ENTRY_PATH")"
-	EXEC="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)")"
-	EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)")"
-	[ -z "$EXECARG" ] && EXECARG="$(trim_spaces "$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)")"
+	EXEC="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	EXEC="$(trim_spaces "$EXEC")"
+	EXECARG="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)"
+	EXECARG="$(trim_spaces "$EXECARG")"
+	if [ -z "$EXECARG" ]
+	then
+		EXECARG="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)"
+		EXECARG="$(trim_spaces "$EXECARG")"
+	fi
 	[ -z "$EXECARG" ] && EXECARG="ExecArg=-e"
 	EXECARG="$(trim_spaces "$(printf "%s\n" "$EXECARG" | cut -d = -f 2-)")"
 else
@@ -298,10 +325,16 @@ fi
 debug "EXEC=$EXEC"
 debug "EXECARG=$EXECARG"
 
-#[ "$DEBUG" = "1" ] && exit 0
-if [ "$#" = "0" ]
-then
-	exec $EXEC
-else
-	exec $EXEC $EXECARG "$@"
-fi
+{
+       if [ "$#" = "0" ]
+       then
+               # prints out only arguments from Exec if any
+               printf '%s' "$EXEC" | execstring2zero | tail -zn +2
+       else
+               # grep adds zero byte at the end if anything was printed
+               printf '%s' "$EXEC" | execstring2zero | tail -zn +2 | grep -z .
+               printf '%s' "$EXECARG"
+               printf '%b' '\0'
+               args2zero "$@"
+       fi
+} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
