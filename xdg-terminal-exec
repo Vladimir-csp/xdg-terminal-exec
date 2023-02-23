@@ -22,7 +22,7 @@ DATA_PREFIX_DIR=xdg-terminals
 CONFIG_NAME=xdg-terminals.list
 
 DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
 
 DATA=''
 BLACKLIST=''

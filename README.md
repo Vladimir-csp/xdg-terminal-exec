@@ -15,6 +15,8 @@ Default paths are resolved into:
   - `$HOME/.config/xdg-terminals.list`
   - `/etc/xdg/$desktop-xdg-terminals.list`
   - `/etc/xdg/xdg-terminals.list`
+  - `/usr/etc/xdg/$desktop-xdg-terminals.list`
+  - `/usr/etc/xdg/xdg-terminals.list`
 - data
   - `$HOME/.local/share/xdg-terminals/`
   - `/usr/local/share/xdg-terminals`
