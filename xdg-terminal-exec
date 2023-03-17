@@ -391,7 +391,7 @@ End of final argv"
 # use pseudographics to increase chances
 for CHAR in '│' '─' '■' '▒' '○' '┼' '║' '╟' '╢'
 do
-	if [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "CHAR")" ]
+	if [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "$CHAR")" ]
 	then
 		debug "IFS=$CHAR"
 		IFS="$CHAR"
