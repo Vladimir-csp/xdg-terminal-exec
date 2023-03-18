@@ -238,7 +238,7 @@ check_entry_path(){
 	debug "checking Exec[0]"
 	EXEC0="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	EXEC0="$(trim_spaces "$EXEC0")"
-	EXEC0="$(printf "%s" "$EXEC0" | execstring2zero | head -zn 1)"
+	EXEC0="$(printf "%s" "$EXEC0" | execstring2zero 2>/dev/null | head -zn 1 | tr -d '\0')"
 	if [ -n "$EXEC0" ] && command -v "$EXEC0" > /dev/null
 	then
 		debug "Exec[0] command $EXEC0 exists"
