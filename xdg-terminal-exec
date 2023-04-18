@@ -388,14 +388,17 @@ End of final argv"
 #} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
 
 # choose a character for IFS that is not present in command line
-# use pseudographics to increase chances
-for CHAR in '│' '─' '■' '▒' '○' '┼' '║' '╟' '╢'
+for CHAR in ':' '#' '@' '%' '/' '^' '$' '=' '+' '*' '!' ';' 'END'
 do
-	if [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "$CHAR")" ]
+	if [ "$CHAR" != "END" ] && [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "$CHAR")" ]
 	then
 		debug "IFS=$CHAR"
 		IFS="$CHAR"
 		break
+	elif [ "$CHAR" = "END" ]
+	then
+		echo "Exhausted candidate characters for field separator" >&2
+		exit 1
 	fi
 done
 
