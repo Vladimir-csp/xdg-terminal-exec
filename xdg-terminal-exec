@@ -67,7 +67,6 @@ generate_config_list(){
 	IFS="$OIFS"
 }
 
-
 find_preferred_entry(){
 	# Read entries listed in config files until a valid one is found
 	local ENTRY_ID=
@@ -204,6 +203,12 @@ check_entry_id(){
 	return 0
 }
 
+get_first_arg(){
+	# from complex arg string return first arg
+	eval "set -- $1"
+	echo "$1"
+}
+
 check_entry_path(){
 	# Determine if entry in given path is valid for execution in current DE
 	local ENTRY_PATH=
@@ -238,7 +243,7 @@ check_entry_path(){
 	debug "checking Exec[0]"
 	EXEC0="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	EXEC0="$(trim_spaces "$EXEC0")"
-	EXEC0="$(printf "%s" "$EXEC0" | execstring2zero 2>/dev/null | head -zn 1 | tr -d '\0')"
+	EXEC0="$(get_first_arg "$EXEC0")"
 	if [ -n "$EXEC0" ] && command -v "$EXEC0" > /dev/null
 	then
 		debug "Exec[0] command $EXEC0 exists"
@@ -305,40 +310,6 @@ read_entry_path(){
 	done < "${ENTRY_PATH}"
 }
 
-execstring2zero() {
-	# converts argument string from stdin to zero-delimited list
-	xargs sh -c 'NOT_FIRST_ARG=false ; for ARG in "$@" ; do [ "$NOT_FIRST_ARG" = "true" ] && printf "%b" "\0" ; printf "%s" "$ARG" ; NOT_FIRST_ARG=true ; done' arg-splitter
-}
-
-args2zero() {
-	# converts argument array to zero-delimited list
-	NOT_FIRST_ARG=false
-	for ARG in "$@"
-	do
-		[ "$NOT_FIRST_ARG" = "true" ] && printf '%b' '\0'
-		printf '%s' "$ARG"
-		NOT_FIRST_ARG=true
-	done
-	unset NOT_FIRST_ARG
-}
-
-construct_argv() {
-	# outputs zero-delimited full final argv list
-	if [ "$#" = "0" ]
-	then
-		printf '%s' "$EXEC" | execstring2zero
-	else
-		printf '%s' "$EXEC" | execstring2zero
-		if [ -n "$EXECARG" ]
-		then
-			printf '%b' '\0'
-			printf '%s' "$EXECARG"
-		fi
-		printf '%b' '\0'
-		args2zero "$@"
-	fi
-}
-
 ENTRY_PATH="$(find_preferred_entry)"
 [ -z "$ENTRY_PATH" ] && ENTRY_PATH="$(find_any_entry)"
 
@@ -362,47 +333,30 @@ else
 	EXECARG="-e"
 fi
 
+ORIG_ARGV="$@"
+
+if [ "$#" -gt 0 ]
+then
+	if [ -n "$EXECARG" ]
+	then
+		eval "set -- $EXEC \"\$EXECARG\" \"\$@\""
+	else
+		eval "set -- $EXEC \"\$@\""
+	fi
+else
+	eval "set -- $EXEC"
+fi
+
 debug "EXEC=$EXEC
 EXECARG=$EXECARG
-ARGV=$*
-Final argv (per line):
-$(construct_argv "$@" | tr '\0' "\n")
+ARGV=$ORIG_ARGV
+Final argv (>arg< per line):
+$(
+	for ARG in "$@"
+	do
+		echo ">$ARG<"
+	done
+)
 End of final argv"
 
-# this variant is robust, but spawns xargs process instead of clean exec
-#{
-#	if [ "$#" = "0" ]
-#	then
-#		# prints out only arguments from Exec if any
-#		printf '%s' "$EXEC" | execstring2zero | tail -zn +2
-#	else
-#		# grep adds zero byte at the end if anything was printed
-#		printf '%s' "$EXEC" | execstring2zero | tail -zn +2 | grep -z .
-#		if [ -n "$EXECARG" ]
-#		then
-#			printf '%s' "$EXECARG"
-#			printf '%b' '\0'
-#		fi
-#		args2zero "$@"
-#	fi
-#} | exec xargs -o0 "$(printf '%s' "$EXEC" | execstring2zero | head -zn 1)"
-
-# choose a character for IFS that is not present in command line
-for CHAR in ':' '#' '@' '%' '/' '^' '$' '=' '+' '*' '!' ';' 'END'
-do
-	if [ "$CHAR" != "END" ] && [ "$(printf '%s' "$EXEC $EXECARG $*")" = "$(printf '%s' "$EXEC $EXECARG $*" | tr -d "$CHAR")" ]
-	then
-		debug "IFS=$CHAR"
-		IFS="$CHAR"
-		break
-	elif [ "$CHAR" = "END" ]
-	then
-		echo "Exhausted candidate characters for field separator" >&2
-		exit 1
-	fi
-done
-
-# feed exec a string, separated by chosen $IFS
-exec $(
-	construct_argv "$@" | tr '\0' "$IFS"
-)
+exec "$@"
