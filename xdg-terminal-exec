@@ -124,7 +124,7 @@ find_any_entry(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			ENTRY_FILES="$(find "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
+			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
 			while read ENTRY_FILE
 			do
 				[ -z "$ENTRY_FILE" ] && continue
