@@ -26,7 +26,6 @@ CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/u
 
 DATA=''
 BLACKLIST=''
-ENTRY=''
 EXEC=''
 EXECARG=''
 
@@ -37,7 +36,6 @@ debug(){
 }
 
 trim_spaces(){
-	local TRIMVAR
 	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
 	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
@@ -45,7 +43,6 @@ trim_spaces(){
 }
 
 trim_comment(){
-	local TRIMVAR
 	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR%%#*}"
 	printf "%s" "$TRIMVAR"
@@ -53,7 +50,7 @@ trim_comment(){
 
 generate_config_list(){
 	# Generate list of possible config files for current DE
-	local DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
+	DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
 	IFS=":"
 	debug "lower case desktops are: \"${DESKTOPS_LC}\""
 	for CONFIG_DIR in $CONF_HIERARCHY
@@ -69,21 +66,20 @@ generate_config_list(){
 
 find_preferred_entry(){
 	# Read entries listed in config files until a valid one is found
-	local ENTRY_ID=
-	local SKIP=
-	local CONFIG_LIST=
+	ENTRY_ID=
+	CONFIG_LIST=
 
 	CONFIG_LIST="$(generate_config_list)"
 
 	debug "finding preferred entry in configs"
 
-	while read CONFIG_FILE
+	while read -r CONFIG_FILE
 	do
 		debug "looking for config \"${CONFIG_FILE}\""
 		if [ -f "${CONFIG_FILE}" ]
 		then
 			debug "reading config \"${CONFIG_FILE}\""
-			while read LINE
+			while read -r LINE
 			do
 				debug "parsing line \"$LINE\""
 				LINE="$(trim_comment "$LINE")"
@@ -113,9 +109,9 @@ EOF
 
 find_any_entry(){
 	# Read entries in data dirs until a valid one is found
-	local ENTRY_ID=
-	local ENTRY_PATH=
-	local ENTRY_FILES=
+	ENTRY_ID=
+	ENTRY_PATH=
+	ENTRY_FILES=
 	debug "looking for first available entry in data hierarchy"
 	IFS=":"
 	for DATA_DIR in $DATA_HIERARCHY
@@ -125,7 +121,7 @@ find_any_entry(){
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
 			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
-			while read ENTRY_FILE
+			while read -r ENTRY_FILE
 			do
 				[ -z "$ENTRY_FILE" ] && continue
 				ENTRY_ID="$(printf "%s" "$ENTRY_FILE" | tr '/' '-')"
@@ -151,13 +147,12 @@ EOF
 
 find_entry_path(){
 	# For given desktop entry ID find an actual file path
-	local ENTRY_ID=
-	local ENTRY_FILE=
-	local ENTRY_PATH=
-	local DATA_DIR=
-	local FILE_LIST=
-	local ID_LIST=
-	local ID_NUM=
+	ENTRY_FILE=
+	ENTRY_PATH=
+	DATA_DIR=
+	FILE_LIST=
+	ID_LIST=
+	ID_NUM=
 
 	ENTRY_ID="$1"
 
@@ -172,7 +167,12 @@ find_entry_path(){
 			ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
 			ID_NUM="$(printf "%s" "$ID_LIST" | grep -n "^${ENTRY_ID}$" | head -n 1 | cut -d : -f 1)"
 			ENTRY_FILE="$(printf "%s" "$FILE_LIST" | head -n "${ID_NUM:-0}" | tail -n 1)"
-			[ -n "$ENTRY_FILE" ] && ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY_FILE}" || continue
+			if [ -n "$ENTRY_FILE" ]
+			then
+				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY_FILE}"
+			else
+				continue
+			fi
 			debug "got entry path \"$ENTRY_PATH\""
 			printf "%s" "$ENTRY_PATH"
 			return 0
@@ -185,7 +185,6 @@ find_entry_path(){
 
 check_entry_id(){
 	# Check if entry ID is blacklisted by previous checks
-	local ENTRY_ID
 	ENTRY_ID="$1"
 
 	debug "checking if ID \"$ENTRY_ID\" is in blacklist \"$BLACKLIST\""
@@ -211,14 +210,13 @@ get_first_arg(){
 
 check_entry_path(){
 	# Determine if entry in given path is valid for execution in current DE
-	local ENTRY_PATH=
-	local DATA=
-	local TRYEXEC=
-	local EXEC0=
-	local NOTSHOWIN=
-	local ONLYSHOWIN=
-	local HIDDEN=
-	local FAIL=0
+	DATA=
+	TRYEXEC=
+	EXEC0=
+	NOTSHOWIN=
+	ONLYSHOWIN=
+	HIDDEN=
+	FAIL=0
 
 	ENTRY_PATH="$1"
 	DATA="$(read_entry_path "$ENTRY_PATH")"
@@ -297,8 +295,7 @@ check_entry_path(){
 
 read_entry_path(){
 	# read entry, only "Desktop Entry" section
-	local ENTRY_PATH=
-	local DE="0"
+	DE="0"
 	ENTRY_PATH="$1"
 	while read -r LINE
 	do
@@ -333,7 +330,7 @@ else
 	EXECARG="-e"
 fi
 
-ORIG_ARGV="$@"
+ORIG_ARGV="$*"
 
 if [ "$#" -gt 0 ]
 then
