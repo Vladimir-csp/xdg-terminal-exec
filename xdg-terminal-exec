@@ -31,32 +31,32 @@ EXECARG=''
 OIFS="$IFS"
 
 debug() {
-	[ "$DEBUG" = "1" ] && printf "%s\n" "$1" >&2
+	[ "$DEBUG" = '1' ] && printf '%s\n' "$1" >&2
 }
 
 trim_spaces() {
 	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
 	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
-	printf "%s" "$TRIMVAR"
+	printf '%s' "$TRIMVAR"
 }
 
 trim_comment() {
 	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR%%#*}"
-	printf "%s" "$TRIMVAR"
+	printf '%s' "$TRIMVAR"
 }
 
 generate_config_list() {
 	# Generate list of possible config files for current DE
-	DESKTOPS_LC="$(printf "%s" "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
-	IFS=":"
+	DESKTOPS_LC="$(printf '%s' "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
+	IFS=':'
 	debug "lower case desktops are: \"${DESKTOPS_LC}\""
 	for CONFIG_DIR in $CONF_HIERARCHY; do
 		for DESKTOP in $DESKTOPS_LC; do
-			printf "%s\n" "${CONFIG_DIR}/${DESKTOP}${DESKTOP:+-}${CONFIG_NAME}"
+			printf '%s\n' "${CONFIG_DIR}/${DESKTOP}${DESKTOP:+-}${CONFIG_NAME}"
 		done
-		printf "%s\n" "${CONFIG_DIR}/${CONFIG_NAME}"
+		printf '%s\n' "${CONFIG_DIR}/${CONFIG_NAME}"
 	done | uniq
 	IFS="$OIFS"
 }
@@ -68,7 +68,7 @@ find_preferred_entry() {
 
 	CONFIG_LIST="$(generate_config_list)"
 
-	debug "finding preferred entry in configs"
+	debug 'finding preferred entry in configs'
 
 	while read -r CONFIG_FILE; do
 		debug "looking for config \"${CONFIG_FILE}\""
@@ -86,7 +86,7 @@ find_preferred_entry() {
 				ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
 				if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
 					debug "file at path \"$ENTRY_PATH\" checks out"
-					printf "%s" "$ENTRY_PATH"
+					printf '%s' "$ENTRY_PATH"
 					return 0
 				else
 					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
@@ -105,8 +105,8 @@ find_any_entry() {
 	ENTRY_ID=
 	ENTRY_PATH=
 	ENTRY_FILES=
-	debug "looking for first available entry in data hierarchy"
-	IFS=":"
+	debug 'looking for first available entry in data hierarchy'
+	IFS=':'
 	for DATA_DIR in $DATA_HIERARCHY; do
 		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
@@ -119,7 +119,7 @@ find_any_entry() {
 				check_entry_id "$ENTRY_ID" || continue
 				if check_entry_path "$ENTRY_PATH"; then
 					debug "file at path \"$ENTRY_PATH\" checks out"
-					printf "%s" "$ENTRY_PATH"
+					printf '%s' "$ENTRY_PATH"
 					return 0
 				else
 					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
@@ -142,7 +142,7 @@ find_entry_path() {
 
 	ENTRY_ID="$1"
 
-	IFS=":"
+	IFS=':'
 	for DATA_DIR in $DATA_HIERARCHY; do
 		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
@@ -175,7 +175,7 @@ check_entry_id() {
 	for ITEM in $BLACKLIST; do
 		IFS="$OIFS"
 		if [ "$ENTRY_ID" = "$ITEM" ]; then
-			debug "blacklist positive"
+			debug 'blacklist positive'
 			return 1
 		fi
 	done
@@ -202,11 +202,11 @@ check_entry_path() {
 	ENTRY_PATH="$1"
 	DATA="$(read_entry_path "$ENTRY_PATH")"
 
-	debug "checking TryExec"
-	TRYEXEC="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	debug 'checking TryExec'
+	TRYEXEC="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	TRYEXEC="$(trim_spaces "$TRYEXEC")"
 	if [ -n "$TRYEXEC" ]; then
-		debug "TryExec is defined"
+		debug 'TryExec is defined'
 		if command -v "$TRYEXEC" > /dev/null; then
 			debug "TryExec command $TRYEXEC exists"
 		else
@@ -214,11 +214,11 @@ check_entry_path() {
 			return 1
 		fi
 	else
-		debug "TryExec not defined"
+		debug 'TryExec not defined'
 	fi
 
-	debug "checking Exec[0]"
-	EXEC0="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	debug 'checking Exec[0]'
+	EXEC0="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	EXEC0="$(trim_spaces "$EXEC0")"
 	EXEC0="$(get_first_arg "$EXEC0")"
 	if [ -n "$EXEC0" ] && command -v "$EXEC0" > /dev/null; then
@@ -228,13 +228,13 @@ check_entry_path() {
 		return 1
 	fi
 
-	debug "checking Hidden"
-	HIDDEN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	debug 'checking Hidden'
+	HIDDEN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	HIDDEN="$(trim_spaces "$HIDDEN")"
-	[ "$HIDDEN" = "true" ] && return 1
+	[ "$HIDDEN" = 'true' ] && return 1
 
-	debug "checking NotShowIn"
-	NOTSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	debug 'checking NotShowIn'
+	NOTSHOWIN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	NOTSHOWIN="$(trim_spaces "$NOTSHOWIN")"
 	IFS=';'
 	for ITEM in $NOTSHOWIN; do
@@ -247,8 +247,8 @@ check_entry_path() {
 	done
 	IFS="$OIFS"
 
-	debug "checking OnlyShowIn"
-	ONLYSHOWIN="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	debug 'checking OnlyShowIn'
+	ONLYSHOWIN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	ONLYSHOWIN="$(trim_spaces "$ONLYSHOWIN")"
 	IFS=';'
 	for ITEM in $ONLYSHOWIN; do
@@ -262,23 +262,23 @@ check_entry_path() {
 				break
 			}
 		done
-		[ "$FAIL" = "0" ] && break
+		[ "$FAIL" = '0' ] && break
 	done
 	IFS="$OIFS"
-	[ "$FAIL" = "1" ] && return 1
+	[ "$FAIL" = '1' ] && return 1
 
 	return 0
 }
 
 read_entry_path() {
-	# read entry, only "Desktop Entry" section
-	DE="0"
+	# read entry, only 'Desktop Entry' section
+	DE='0'
 	ENTRY_PATH="$1"
 	while read -r LINE; do
-		if printf "%s" "$LINE" | grep -q "^[[:space:]]*\["; then
-			printf "%s" "$LINE" | grep -qi "^[[:space:]]*\[Desktop Entry\]" && DE=1 || DE=0
+		if printf '%s' "$LINE" | grep -q '^[[:space:]]*\['; then
+			printf '%s' "$LINE" | grep -qi '^[[:space:]]*\[Desktop Entry\]' && DE=1 || DE=0
 		fi
-		[ "$DE" = "1" ] && printf "%s\n" "$LINE"
+		[ "$DE" = '1' ] && printf '%s\n' "$LINE"
 	done < "${ENTRY_PATH}"
 }
 
@@ -287,20 +287,20 @@ ENTRY_PATH="$(find_preferred_entry)"
 
 if [ -n "$ENTRY_PATH" ]; then
 	DATA="$(read_entry_path "$ENTRY_PATH")"
-	EXEC="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
+	EXEC="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
 	EXEC="$(trim_spaces "$EXEC")"
-	EXECARG="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)"
+	EXECARG="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)"
 	EXECARG="$(trim_spaces "$EXECARG")"
 	if [ -z "$EXECARG" ]; then
-		EXECARG="$(printf "%s\n" "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)"
+		EXECARG="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)"
 		EXECARG="$(trim_spaces "$EXECARG")"
 	fi
-	[ -z "$EXECARG" ] && EXECARG="ExecArg=-e"
-	EXECARG="$(printf "%s\n" "$EXECARG" | cut -d = -f 2-)"
+	[ -z "$EXECARG" ] && EXECARG='ExecArg=-e'
+	EXECARG="$(printf '%s\n' "$EXECARG" | cut -d = -f 2-)"
 	EXECARG="$(trim_spaces "$EXECARG")"
 else
-	EXEC="xterm"
-	EXECARG="-e"
+	EXEC='xterm'
+	EXECARG='-e'
 fi
 
 ORIG_ARGV="$*"
