@@ -120,12 +120,12 @@ find_any_entry(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
-			while read -r ENTRY_FILE
+			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
+			while read -r ENTRY_PATH
 			do
-				[ -z "$ENTRY_FILE" ] && continue
-				ENTRY_ID="$(printf "%s" "$ENTRY_FILE" | tr '/' '-')"
-				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/$ENTRY_FILE"
+				[ -z "$ENTRY_PATH" ] && continue
+				ENTRY_FILE="${ENTRY_PATH#"${DATA_DIR}/${DATA_PREFIX_DIR}/"}"
+				ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
 				check_entry_id "$ENTRY_ID" || continue
 				if check_entry_path "$ENTRY_PATH"
 				then
@@ -150,9 +150,6 @@ find_entry_path(){
 	ENTRY_FILE=
 	ENTRY_PATH=
 	DATA_DIR=
-	FILE_LIST=
-	ID_LIST=
-	ID_NUM=
 
 	ENTRY_ID="$1"
 
@@ -163,19 +160,19 @@ find_entry_path(){
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]
 		then
 			debug "looking in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
-			FILE_LIST="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname "*.desktop" -printf "%P\n")"
-			ID_LIST="$(printf "%s" "$FILE_LIST" | tr '/' '-')"
-			ID_NUM="$(printf "%s" "$ID_LIST" | grep -n "^${ENTRY_ID}$" | head -n 1 | cut -d : -f 1)"
-			ENTRY_FILE="$(printf "%s" "$FILE_LIST" | head -n "${ID_NUM:-0}" | tail -n 1)"
-			if [ -n "$ENTRY_FILE" ]
-			then
-				ENTRY_PATH="${DATA_DIR}/${DATA_PREFIX_DIR}/${ENTRY_FILE}"
-			else
-				continue
-			fi
-			debug "got entry path \"$ENTRY_PATH\""
-			printf "%s" "$ENTRY_PATH"
-			return 0
+			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
+			while read -r ENTRY_PATH
+			do
+				[ -z "$ENTRY_PATH" ] && continue
+				ENTRY_FILE="${ENTRY_PATH#"${DATA_DIR}/${DATA_PREFIX_DIR}/"}"
+				FOUND_ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
+				[ "$FOUND_ENTRY_ID" != "$ENTRY_ID" ] && continue
+				debug "got entry path \"$ENTRY_PATH\""
+				printf '%s' "$ENTRY_PATH"
+				return 0
+			done << EOF
+$ENTRY_FILES
+EOF
 		fi
 	done
 	IFS="$OIFS"
