@@ -95,9 +95,9 @@ find_preferred_entry() {
 				fi
 			done < "${CONFIG_FILE}"
 		fi
-	done << EOF
-$CONFIG_LIST
-EOF
+	done <<- EOF
+		$CONFIG_LIST
+	EOF
 }
 
 find_any_entry() {
@@ -126,9 +126,9 @@ find_any_entry() {
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
 					debug "current blacklist: \"$BLACKLIST\""
 				fi
-			done << EOF
-$ENTRY_FILES
-EOF
+			done <<- EOF
+				$ENTRY_FILES
+			EOF
 		fi
 	done
 	IFS="$OIFS"
@@ -156,9 +156,9 @@ find_entry_path() {
 				debug "got entry path \"$ENTRY_PATH\""
 				printf '%s' "$ENTRY_PATH"
 				return 0
-			done << EOF
-$ENTRY_FILES
-EOF
+			done <<- EOF
+				$ENTRY_FILES
+			EOF
 		fi
 	done
 	IFS="$OIFS"
