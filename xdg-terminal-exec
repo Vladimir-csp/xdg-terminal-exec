@@ -65,9 +65,6 @@ generate_config_list() {
 
 find_preferred_entry() {
 	# Read entries listed in config files until a valid one is found
-	ENTRY_ID=
-	CONFIG_LIST=
-
 	CONFIG_LIST="$(generate_config_list)"
 
 	debug 'finding preferred entry in configs'
@@ -104,9 +101,6 @@ find_preferred_entry() {
 
 find_any_entry() {
 	# Read entries in data dirs until a valid one is found
-	ENTRY_ID=
-	ENTRY_PATH=
-	ENTRY_FILES=
 	debug 'looking for first available entry in data hierarchy'
 	IFS=':'
 	for DATA_DIR in $DATA_HIERARCHY; do
@@ -138,10 +132,6 @@ find_any_entry() {
 
 find_entry_path() {
 	# For given desktop entry ID find an actual file path
-	ENTRY_FILE=
-	ENTRY_PATH=
-	DATA_DIR=
-
 	ENTRY_ID="$1"
 
 	IFS=':'
@@ -193,14 +183,7 @@ get_first_arg() {
 
 check_entry_path() {
 	# Determine if entry in given path is valid for execution in current DE
-	DATA=
-	TRYEXEC=
-	EXEC0=
-	NOTSHOWIN=
-	ONLYSHOWIN=
-	HIDDEN=
 	FAIL=0
-
 	ENTRY_PATH="$1"
 	DATA="$(read_entry_path "$ENTRY_PATH")"
 
