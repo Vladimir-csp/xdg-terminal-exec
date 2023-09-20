@@ -30,9 +30,11 @@ EXECARG=''
 
 OIFS="$IFS"
 
-debug() {
-	[ "$DEBUG" = '1' ] && printf '%s\n' "$1" >&2
-}
+if [ "$DEBUG" -eq 1 ]; then
+	debug() { printf '%s\n' "$1" >&2; }
+else
+	debug() { :; }
+fi
 
 trim_spaces() {
 	TRIMVAR="$*"
@@ -51,7 +53,7 @@ generate_config_list() {
 	# Generate list of possible config files for current DE
 	DESKTOPS_LC="$(printf '%s' "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
 	IFS=':'
-	debug "lower case desktops are: \"${DESKTOPS_LC}\""
+	debug "lower case desktops are: '${DESKTOPS_LC}'"
 	for CONFIG_DIR in $CONF_HIERARCHY; do
 		for DESKTOP in $DESKTOPS_LC; do
 			printf '%s\n' "${CONFIG_DIR}/${DESKTOP}${DESKTOP:+-}${CONFIG_NAME}"
@@ -71,25 +73,25 @@ find_preferred_entry() {
 	debug 'finding preferred entry in configs'
 
 	while read -r CONFIG_FILE; do
-		debug "looking for config \"${CONFIG_FILE}\""
+		debug "looking for config '${CONFIG_FILE}'"
 		if [ -f "${CONFIG_FILE}" ]; then
-			debug "reading config \"${CONFIG_FILE}\""
+			debug "reading config '${CONFIG_FILE}'"
 			while read -r LINE; do
-				debug "parsing line \"$LINE\""
+				debug "parsing line '$LINE'"
 				LINE="$(trim_comment "$LINE")"
 				LINE="$(trim_spaces "$LINE")"
 				[ -z "$LINE" ] && continue || ENTRY_ID="$LINE"
-				debug "retrieved entry ID \"$ENTRY_ID\""
+				debug "retrieved entry ID '$ENTRY_ID'"
 				check_entry_id "$ENTRY_ID" || continue
 
-				debug "finding path for entry ID \"$ENTRY_ID\""
+				debug "finding path for entry ID '$ENTRY_ID'"
 				ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
 				if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
-					debug "file at path \"$ENTRY_PATH\" checks out"
+					debug "file at path '$ENTRY_PATH' checks out"
 					printf '%s' "$ENTRY_PATH"
 					return 0
 				else
-					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
+					debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
 					continue
 				fi
@@ -110,7 +112,7 @@ find_any_entry() {
 	for DATA_DIR in $DATA_HIERARCHY; do
 		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
-			debug "searching in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
+			debug "searching in '${DATA_DIR}/${DATA_PREFIX_DIR}'"
 			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
 			while read -r ENTRY_PATH; do
 				[ -z "$ENTRY_PATH" ] && continue
@@ -118,13 +120,13 @@ find_any_entry() {
 				ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
 				check_entry_id "$ENTRY_ID" || continue
 				if check_entry_path "$ENTRY_PATH"; then
-					debug "file at path \"$ENTRY_PATH\" checks out"
+					debug "file at path '$ENTRY_PATH' checks out"
 					printf '%s' "$ENTRY_PATH"
 					return 0
 				else
-					debug "entry ID \"$ENTRY_ID\" failed check at path \"$ENTRY_PATH\", blacklisting"
+					debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
 					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
-					debug "current blacklist: \"$BLACKLIST\""
+					debug "current blacklist: '$BLACKLIST'"
 				fi
 			done <<- EOF
 				$ENTRY_FILES
@@ -146,14 +148,14 @@ find_entry_path() {
 	for DATA_DIR in $DATA_HIERARCHY; do
 		IFS="$OIFS"
 		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
-			debug "looking in \"${DATA_DIR}/${DATA_PREFIX_DIR}\""
+			debug "looking in '${DATA_DIR}/${DATA_PREFIX_DIR}'"
 			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
 			while read -r ENTRY_PATH; do
 				[ -z "$ENTRY_PATH" ] && continue
 				ENTRY_FILE="${ENTRY_PATH#"${DATA_DIR}/${DATA_PREFIX_DIR}/"}"
 				FOUND_ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
 				[ "$FOUND_ENTRY_ID" != "$ENTRY_ID" ] && continue
-				debug "got entry path \"$ENTRY_PATH\""
+				debug "got entry path '$ENTRY_PATH'"
 				printf '%s' "$ENTRY_PATH"
 				return 0
 			done <<- EOF
@@ -162,7 +164,7 @@ find_entry_path() {
 		fi
 	done
 	IFS="$OIFS"
-	debug "path not found for entry ID \"$ENTRY_ID\""
+	debug "path not found for entry ID '$ENTRY_ID'"
 	return 1
 }
 
@@ -170,7 +172,7 @@ check_entry_id() {
 	# Check if entry ID is blacklisted by previous checks
 	ENTRY_ID="$1"
 
-	debug "checking if ID \"$ENTRY_ID\" is in blacklist \"$BLACKLIST\""
+	debug "checking if ID '$ENTRY_ID' is in blacklist '$BLACKLIST'"
 	IFS=';'
 	for ITEM in $BLACKLIST; do
 		IFS="$OIFS"
@@ -186,7 +188,7 @@ check_entry_id() {
 get_first_arg() {
 	# from complex arg string return first arg
 	eval "set -- $1"
-	echo "$1"
+	printf '%s\n' "$1"
 }
 
 check_entry_path() {
@@ -241,7 +243,7 @@ check_entry_path() {
 		IFS=:
 		for DESKTOP in $XDG_CURRENT_DESKTOP; do
 			IFS="$OIFS"
-			debug "checking NotShowIn against \"$DESKTOP\"=\"$ITEM\""
+			debug "checking NotShowIn against '$DESKTOP'='$ITEM'"
 			[ "$DESKTOP" = "$ITEM" ] && return 1
 		done
 	done
@@ -256,7 +258,7 @@ check_entry_path() {
 		IFS=:
 		for DESKTOP in $XDG_CURRENT_DESKTOP; do
 			IFS="$OIFS"
-			debug "checking OnlyShowIn against \"$DESKTOP\"=\"$ITEM\""
+			debug "checking OnlyShowIn against '$DESKTOP'='$ITEM'"
 			[ "$DESKTOP" = "$ITEM" ] && {
 				FAIL=0
 				break
@@ -319,11 +321,7 @@ debug "EXEC=$EXEC
 EXECARG=$EXECARG
 ARGV=$ORIG_ARGV
 Final argv (>arg< per line):
-$(
-	for ARG in "$@"; do
-		echo ">$ARG<"
-	done
-)
+$(printf '>%s<\n' "$@")
 End of final argv"
 
 exec "$@"
