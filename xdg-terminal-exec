@@ -17,6 +17,10 @@
 # ENTRY_ID - ENTRY_FILE with '/' swapped for '-' (see section E of Desktop Entry Spec)
 # ENTRY_PATH - full path of specific desktop entry file
 
+# Treat non-zero exit status from simple commands as an error
+# Treat unset variables as errors when performing parameter expansion
+set -eu
+
 DATA_PREFIX_DIR=xdg-terminals
 CONFIG_NAME=xdg-terminals.list
 
@@ -30,12 +34,7 @@ EXECARG=''
 
 OIFS="$IFS"
 
-# default debug (and drop non-numeric value)
-if [ -z "$DEBUG" ] || [ "$DEBUG" != "${DEBUG:##*[!0-9]*}" ]; then
-	DEBUG=0
-fi
-
-if [ "$DEBUG" -gt 0 ]; then
+if [ "${DEBUG-0}" = '1' ]; then
 	debug() { printf '%s\n' "$1" >&2; }
 else
 	debug() { :; }
@@ -56,7 +55,7 @@ trim_comment() {
 
 generate_config_list() {
 	# Generate list of possible config files for current DE
-	DESKTOPS_LC="$(printf '%s' "$XDG_CURRENT_DESKTOP" | tr '[:upper:]' '[:lower:]')"
+	DESKTOPS_LC="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
 	IFS=':'
 	debug "lower case desktops are: '${DESKTOPS_LC}'"
 	for CONFIG_DIR in $CONF_HIERARCHY; do
@@ -270,6 +269,7 @@ read_entry_path() {
 		fi
 		[ "$DE" = '1' ] && printf '%s\n' "$LINE"
 	done < "${ENTRY_PATH}"
+	return 0
 }
 
 ENTRY_PATH="$(find_preferred_entry)"
