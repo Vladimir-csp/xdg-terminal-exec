@@ -30,7 +30,12 @@ EXECARG=''
 
 OIFS="$IFS"
 
-if [ "$DEBUG" -eq 1 ]; then
+# default debug (and drop non-numeric value)
+if [ -z "$DEBUG" ] || [ "$DEBUG" != "${DEBUG:##*[!0-9]*}" ]; then
+	DEBUG=0
+fi
+
+if [ "$DEBUG" -gt 0 ]; then
 	debug() { printf '%s\n' "$1" >&2; }
 else
 	debug() { :; }
