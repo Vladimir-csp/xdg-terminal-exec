@@ -52,12 +52,6 @@ trim_spaces() {
 	printf '%s' "$TRIMVAR"
 }
 
-trim_comment() {
-	TRIMVAR="$*"
-	TRIMVAR="${TRIMVAR%%#*}"
-	printf '%s' "$TRIMVAR"
-}
-
 generate_config_list() {
 	# Generate list of possible config files for current DE
 	DESKTOPS_LC="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
@@ -72,6 +66,23 @@ generate_config_list() {
 	IFS="$OIFS"
 }
 
+# Read config from given path, print sanitised entries
+read_config_path() {
+	config_path="$1"
+
+	debug "reading config '$config_path'"
+	[ -f "$config_path" ] || return 0
+	# Let `read` trim leading/trailing whitespace from the line
+	while read -r line; do
+		debug "read line '$line'"
+		case $line in
+		# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
+		[A-Za-z_]*) printf '%s\n' "$line" ;;
+		esac
+		# By default empty lines and comments get ignored
+	done < "$config_path"
+}
+
 find_preferred_entry() {
 	# Read entries listed in config files until a valid one is found
 	CONFIG_LIST="$(generate_config_list)"
@@ -80,29 +91,22 @@ find_preferred_entry() {
 
 	while read -r CONFIG_FILE; do
 		debug "looking for config '${CONFIG_FILE}'"
-		if [ -f "${CONFIG_FILE}" ]; then
-			debug "reading config '${CONFIG_FILE}'"
-			while read -r LINE; do
-				debug "parsing line '$LINE'"
-				LINE="$(trim_comment "$LINE")"
-				LINE="$(trim_spaces "$LINE")"
-				[ -z "$LINE" ] && continue || ENTRY_ID="$LINE"
-				debug "retrieved entry ID '$ENTRY_ID'"
-				check_entry_id "$ENTRY_ID" || continue
+		for ENTRY_ID in $(read_config_path "$CONFIG_FILE"); do
+			debug "retrieved entry ID '$ENTRY_ID'"
+			check_entry_id "$ENTRY_ID" || continue
 
-				debug "finding path for entry ID '$ENTRY_ID'"
-				ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
-				if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
-					debug "file at path '$ENTRY_PATH' checks out"
-					printf '%s' "$ENTRY_PATH"
-					return 0
-				else
-					debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
-					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
-					continue
-				fi
-			done < "${CONFIG_FILE}"
-		fi
+			debug "finding path for entry ID '$ENTRY_ID'"
+			ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
+			if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
+				debug "file at path '$ENTRY_PATH' checks out"
+				printf '%s' "$ENTRY_PATH"
+				return 0
+			else
+				debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
+				BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
+				continue
+			fi
+		done
 	done <<- EOF
 		$CONFIG_LIST
 	EOF
