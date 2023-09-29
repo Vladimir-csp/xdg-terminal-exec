@@ -259,16 +259,23 @@ check_entry_path() {
 	return 0
 }
 
+# Read entry from given path, only parse 'Desktop Entry' group
 read_entry_path() {
-	# read entry, only 'Desktop Entry' section
-	DE='0'
-	ENTRY_PATH="$1"
-	while read -r LINE; do
-		if printf '%s' "$LINE" | grep -q '^[[:space:]]*\['; then
-			printf '%s' "$LINE" | grep -qi '^[[:space:]]*\[Desktop Entry\]' && DE=1 || DE=0
-		fi
-		[ "$DE" = '1' ] && printf '%s\n' "$LINE"
-	done < "${ENTRY_PATH}"
+	entry_path="$1"
+
+	debug "reading desktop entry '$entry_path'"
+	# Let `read` trim leading/trailing whitespace from the line
+	while read -r line; do
+		case $line in
+		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
+		'[Desktop Entry]'*) ;;
+		# A `Key=Value` pair, print it
+		[A-Za-z0-9-]*) printf '%s\n' "$line" ;;
+		# Start of the next group header, stop
+		'['*) break ;;
+		esac
+		# By default empty lines and comments get ignored
+	done < "$entry_path"
 	return 0
 }
 
