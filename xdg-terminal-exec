@@ -40,6 +40,11 @@ else
 	debug() { :; }
 fi
 
+trim_start() {
+	# Remove all but leading whitespace, and trim that from the given string
+	printf '%s' "${1#"${1%%[![:space:]]*}"}"
+}
+
 trim_spaces() {
 	TRIMVAR="$*"
 	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
@@ -179,83 +184,83 @@ check_entry_id() {
 	return 0
 }
 
-get_first_arg() {
-	# from complex arg string return first arg
-	eval "set -- $1"
-	printf '%s\n' "$1"
+# Check validity of a given entry line
+# Modifies following global variables:
+# EXEC : Program to execute, possibly with arguments. See spec for details.
+# EXECARG : Execution argument for the terminal emulator.
+check_entry() {
+	# Order of checks is important
+	case $1 in
+	'OnlyShowIn'*=*)
+		onlyShowIn=$(trim_start "${1#*=}")
+		debug "read OnlyShowIn '$onlyShowIn'"
+		IFS=';'
+		for name in $onlyShowIn; do
+			IFS=':'
+			for desktop in ${XDG_CURRENT_DESKTOP-}; do
+				IFS="$OIFS"
+				debug "checking OnlyShowIn match '$desktop'='$name'"
+				[ "$desktop" = "$name" ] && return 0
+			done
+		done
+		IFS="$OIFS"
+		# Default in this case is to fail
+		return 1
+		;;
+	'NotShowIn'*=*)
+		notShowIn=$(trim_start "${1#*=}")
+		debug "read NotShowIn '$notShowIn'"
+		IFS=';'
+		for name in $notShowIn; do
+			IFS=':'
+			for desktop in ${XDG_CURRENT_DESKTOP-}; do
+				IFS="$OIFS"
+				debug "checking NotShowIn match '$desktop'='$name'"
+				[ "$desktop" = "$name" ] && return 1
+			done
+		done
+		IFS="$OIFS"
+		# Default in this case is to succeed
+		return 0
+		;;
+	'X-ExecArg'*=*)
+		# Set global variable
+		EXECARG=$(trim_start "${1#*=}")
+		debug "read execution argument '$EXECARG'"
+		;;
+	'ExecArg'*=*)
+		# Set global variable
+		EXECARG=$(trim_start "${1#*=}")
+		debug "read execution argument '$EXECARG'"
+		;;
+	'TryExec'*=*)
+		executable=$(trim_start "${1#*=}")
+		debug "checking TryExec executable '$executable'"
+		command -v "$executable" > /dev/null || return 1
+		;;
+	'Hidden'*=*)
+		hidden=$(trim_start "${1#*=}")
+		debug "checking Hidden boolean '$hidden'"
+		[ "$hidden" = 'true' ] && return 1
+		;;
+	'Exec'*=*)
+		# Set global variable
+		EXEC=$(trim_start "${1#*=}")
+		# Get first word from read Exec value
+		eval "set -- $EXEC"
+		exec0="$1"
+		debug "checking Exec[0] executable '$exec0'"
+		command -v "$exec0" > /dev/null || return 1
+		;;
+	esac
+	# By default unrecognised keys, empty lines and comments get ignored
 }
 
 check_entry_path() {
 	# Determine if entry in given path is valid for execution in current DE
-	FAIL=0
-	ENTRY_PATH="$1"
-	DATA="$(read_entry_path "$ENTRY_PATH")"
-
-	debug 'checking TryExec'
-	TRYEXEC="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*TryExec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	TRYEXEC="$(trim_spaces "$TRYEXEC")"
-	if [ -n "$TRYEXEC" ]; then
-		debug 'TryExec is defined'
-		if command -v "$TRYEXEC" > /dev/null; then
-			debug "TryExec command $TRYEXEC exists"
-		else
-			debug "TryExec command $TRYEXEC not found"
-			return 1
-		fi
-	else
-		debug 'TryExec not defined'
-	fi
-
-	debug 'checking Exec[0]'
-	EXEC0="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	EXEC0="$(trim_spaces "$EXEC0")"
-	EXEC0="$(get_first_arg "$EXEC0")"
-	if [ -n "$EXEC0" ] && command -v "$EXEC0" > /dev/null; then
-		debug "Exec[0] command $EXEC0 exists"
-	else
-		debug "Exec[0] command $EXEC0 not found"
-		return 1
-	fi
-
-	debug 'checking Hidden'
-	HIDDEN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Hidden[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	HIDDEN="$(trim_spaces "$HIDDEN")"
-	[ "$HIDDEN" = 'true' ] && return 1
-
-	debug 'checking NotShowIn'
-	NOTSHOWIN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*NotShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	NOTSHOWIN="$(trim_spaces "$NOTSHOWIN")"
-	IFS=';'
-	for ITEM in $NOTSHOWIN; do
-		IFS=:
-		for DESKTOP in $XDG_CURRENT_DESKTOP; do
-			IFS="$OIFS"
-			debug "checking NotShowIn against '$DESKTOP'='$ITEM'"
-			[ "$DESKTOP" = "$ITEM" ] && return 1
-		done
+	for line in $(read_entry_path "$1"); do
+		check_entry "$line" || return 1
 	done
-	IFS="$OIFS"
-
-	debug 'checking OnlyShowIn'
-	ONLYSHOWIN="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*OnlyShowIn[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	ONLYSHOWIN="$(trim_spaces "$ONLYSHOWIN")"
-	IFS=';'
-	for ITEM in $ONLYSHOWIN; do
-		FAIL=1
-		IFS=:
-		for DESKTOP in $XDG_CURRENT_DESKTOP; do
-			IFS="$OIFS"
-			debug "checking OnlyShowIn against '$DESKTOP'='$ITEM'"
-			[ "$DESKTOP" = "$ITEM" ] && {
-				FAIL=0
-				break
-			}
-		done
-		[ "$FAIL" = '0' ] && break
-	done
-	IFS="$OIFS"
-	[ "$FAIL" = '1' ] && return 1
-
 	return 0
 }
 
