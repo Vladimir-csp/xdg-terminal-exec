@@ -16,8 +16,6 @@
 # Treat unset variables as errors when performing parameter expansion
 set -eu
 
-BLACKLIST=''
-
 # Backup original IFS value
 # It is assumed that $OIFS contains the default IFS value
 OIFS="$IFS"
@@ -36,27 +34,6 @@ trim_start() {
 	printf '%s' "${1#"${1%%[![:space:]]*}"}"
 }
 
-trim_spaces() {
-	TRIMVAR="$*"
-	TRIMVAR="${TRIMVAR#"${TRIMVAR%%[![:space:]]*}"}"
-	TRIMVAR="${TRIMVAR%"${TRIMVAR##*[![:space:]]}"}"
-	printf '%s' "$TRIMVAR"
-}
-
-generate_config_list() {
-	# Generate list of possible config files for current DE
-	DESKTOPS_LC="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
-	IFS=':'
-	debug "lower case desktops are: '${DESKTOPS_LC}'"
-	for CONFIG_DIR in $CONF_HIERARCHY; do
-		for DESKTOP in $DESKTOPS_LC; do
-			printf '%s\n' "${CONFIG_DIR}/${DESKTOP}${DESKTOP:+-}${CONFIG_NAME}"
-		done
-		printf '%s\n' "${CONFIG_DIR}/${CONFIG_NAME}"
-	done | uniq
-	IFS="$OIFS"
-}
-
 # Read config from given path, print sanitised entries
 read_config_path() {
 	config_path="$1"
@@ -72,65 +49,6 @@ read_config_path() {
 		esac
 		# By default empty lines and comments get ignored
 	done < "$config_path"
-}
-
-find_preferred_entry() {
-	# Read entries listed in config files until a valid one is found
-	CONFIG_LIST="$(generate_config_list)"
-	debug 'finding preferred entry in configs'
-	while read -r CONFIG_FILE; do
-		debug "looking for config '${CONFIG_FILE}'"
-		for ENTRY_ID in $(read_config_path "$CONFIG_FILE"); do
-			debug "retrieved entry ID '$ENTRY_ID'"
-			check_entry_id "$ENTRY_ID" || continue
-			debug "finding path for entry ID '$ENTRY_ID'"
-			ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
-			if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
-				debug "file at path '$ENTRY_PATH' checks out"
-				printf '%s' "$ENTRY_PATH"
-				return 0
-			else
-				debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
-				BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
-				continue
-			fi
-		done
-	done <<- EOF
-		$CONFIG_LIST
-	EOF
-	return 1
-}
-
-find_any_entry() {
-	# Read entries in data dirs until a valid one is found
-	debug 'looking for first available entry in data hierarchy'
-	IFS=':'
-	for DATA_DIR in $DATA_HIERARCHY; do
-		IFS="$OIFS"
-		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
-			debug "searching in '${DATA_DIR}/${DATA_PREFIX_DIR}'"
-			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
-			while read -r ENTRY_PATH; do
-				[ -z "$ENTRY_PATH" ] && continue
-				ENTRY_FILE="${ENTRY_PATH#"${DATA_DIR}/${DATA_PREFIX_DIR}/"}"
-				ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
-				check_entry_id "$ENTRY_ID" || continue
-				if check_entry_path "$ENTRY_PATH"; then
-					debug "file at path '$ENTRY_PATH' checks out"
-					printf '%s' "$ENTRY_PATH"
-					return 0
-				else
-					debug "entry ID '$ENTRY_ID' failed check at path '$ENTRY_PATH', blacklisting"
-					BLACKLIST="${BLACKLIST}${BLACKLIST:+;}$ENTRY_ID"
-					debug "current blacklist: '$BLACKLIST'"
-				fi
-			done <<- EOF
-				$ENTRY_FILES
-			EOF
-		fi
-	done
-	IFS="$OIFS"
-	return 1
 }
 
 # Find a matching file path for a given entry ID
@@ -156,23 +74,6 @@ find_entry_path() {
 	IFS="$OIFS"
 	debug 'no matching entry path found'
 	return 1
-}
-
-check_entry_id() {
-	# Check if entry ID is blacklisted by previous checks
-	ENTRY_ID="$1"
-
-	debug "checking if ID '$ENTRY_ID' is in blacklist '$BLACKLIST'"
-	IFS=';'
-	for ITEM in $BLACKLIST; do
-		IFS="$OIFS"
-		if [ "$ENTRY_ID" = "$ITEM" ]; then
-			debug 'blacklist positive'
-			return 1
-		fi
-	done
-	IFS="$OIFS"
-	return 0
 }
 
 # Check validity of a given entry line
@@ -245,11 +146,6 @@ check_entry() {
 		;;
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
-}
-
-check_entry_path() {
-	# Determine if entry in given path is valid for execution in current DE
-	read_entry_path "$1"
 }
 
 # Read entry from given path, only parse 'Desktop Entry' group
