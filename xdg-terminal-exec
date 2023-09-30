@@ -27,10 +27,7 @@ CONFIG_NAME=xdg-terminals.list
 DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
 
-DATA=''
 BLACKLIST=''
-EXEC=''
-EXECARG=''
 
 OIFS="$IFS"
 
@@ -110,6 +107,7 @@ find_preferred_entry() {
 	done <<- EOF
 		$CONFIG_LIST
 	EOF
+	return 1
 }
 
 find_any_entry() {
@@ -141,6 +139,7 @@ find_any_entry() {
 		fi
 	done
 	IFS="$OIFS"
+	return 1
 }
 
 find_entry_path() {
@@ -262,10 +261,7 @@ check_entry() {
 
 check_entry_path() {
 	# Determine if entry in given path is valid for execution in current DE
-	for line in $(read_entry_path "$1"); do
-		check_entry "$line" || return 1
-	done
-	return 0
+	read_entry_path "$1"
 }
 
 # Read entry from given path, only parse 'Desktop Entry' group
@@ -278,8 +274,14 @@ read_entry_path() {
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
 		'[Desktop Entry]'*) ;;
-		# A `Key=Value` pair, print it
-		[A-Za-z0-9-]*) printf '%s\n' "$line" ;;
+		# A `Key=Value` pair, check it
+		[A-Za-z0-9-]*)
+			check_entry "$line" && continue
+			# Reset values that might have been set
+			unset EXEC
+			unset EXECARG
+			return 1
+			;;
 		# Start of the next group header, stop
 		'['*) break ;;
 		esac
@@ -288,35 +290,24 @@ read_entry_path() {
 	return 0
 }
 
-ENTRY_PATH="$(find_preferred_entry)"
-[ -z "$ENTRY_PATH" ] && ENTRY_PATH="$(find_any_entry)"
+# See read_entry_path and check_entry
+if find_preferred_entry > /dev/null || find_any_entry > /dev/null; then
+	# Default to '-e' if unset
+	EXECARG=${EXECARG-'-e'}
+fi
 
-if [ -n "$ENTRY_PATH" ]; then
-	DATA="$(read_entry_path "$ENTRY_PATH")"
-	EXEC="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*Exec[[:space:]]*=' | head -n 1 | cut -d = -f 2-)"
-	EXEC="$(trim_spaces "$EXEC")"
-	EXECARG="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*ExecArg[[:space:]]*=' | head -n 1)"
-	EXECARG="$(trim_spaces "$EXECARG")"
-	if [ -z "$EXECARG" ]; then
-		EXECARG="$(printf '%s\n' "$DATA" | grep '^[[:space:]]*X-ExecArg[[:space:]]*=' | head -n 1)"
-		EXECARG="$(trim_spaces "$EXECARG")"
-	fi
-	[ -z "$EXECARG" ] && EXECARG='ExecArg=-e'
-	EXECARG="$(printf '%s\n' "$EXECARG" | cut -d = -f 2-)"
-	EXECARG="$(trim_spaces "$EXECARG")"
-else
+if [ -z "${EXEC-}" ]; then
+	# Set defaults
 	EXEC='xterm'
 	EXECARG='-e'
 fi
 
+# Store original argument list, before it's modified
 ORIG_ARGV="$*"
 
+# `Implementations must undo quoting [in the Exec argument(s)][...]`
 if [ "$#" -gt 0 ]; then
-	if [ -n "$EXECARG" ]; then
-		eval "set -- $EXEC \"\$EXECARG\" \"\$@\""
-	else
-		eval "set -- $EXEC \"\$@\""
-	fi
+	eval "set -- $EXEC ${EXECARG:+'"$EXECARG"'} \"\$@\""
 else
 	eval "set -- $EXEC"
 fi
