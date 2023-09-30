@@ -12,24 +12,18 @@
 # Contributors:
 # Roman Chistokhodov https://github.com/FreeSlave/
 
-# some transitional variables for desktop entries used here:
-# ENTRY_FILE - desktop entry path relative to it's data directory
-# ENTRY_ID - ENTRY_FILE with '/' swapped for '-' (see section E of Desktop Entry Spec)
-# ENTRY_PATH - full path of specific desktop entry file
-
 # Treat non-zero exit status from simple commands as an error
 # Treat unset variables as errors when performing parameter expansion
 set -eu
 
-DATA_PREFIX_DIR=xdg-terminals
-CONFIG_NAME=xdg-terminals.list
-
-DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
-
 BLACKLIST=''
 
+# Backup original IFS value
+# It is assumed that $OIFS contains the default IFS value
 OIFS="$IFS"
+# Newline, utility variable used throughout the script
+N='
+'
 
 if [ "${DEBUG-0}" = '1' ]; then
 	debug() { printf '%s\n' "$1" >&2; }
@@ -83,15 +77,12 @@ read_config_path() {
 find_preferred_entry() {
 	# Read entries listed in config files until a valid one is found
 	CONFIG_LIST="$(generate_config_list)"
-
 	debug 'finding preferred entry in configs'
-
 	while read -r CONFIG_FILE; do
 		debug "looking for config '${CONFIG_FILE}'"
 		for ENTRY_ID in $(read_config_path "$CONFIG_FILE"); do
 			debug "retrieved entry ID '$ENTRY_ID'"
 			check_entry_id "$ENTRY_ID" || continue
-
 			debug "finding path for entry ID '$ENTRY_ID'"
 			ENTRY_PATH="$(find_entry_path "$ENTRY_ID")"
 			if [ -n "$ENTRY_PATH" ] && check_entry_path "$ENTRY_PATH"; then
@@ -142,31 +133,28 @@ find_any_entry() {
 	return 1
 }
 
+# Find a matching file path for a given entry ID
 find_entry_path() {
-	# For given desktop entry ID find an actual file path
-	ENTRY_ID="$1"
+	entry_id="$1"
+	debug "finding path for entry id '$entry_id'"
 
-	IFS=':'
-	for DATA_DIR in $DATA_HIERARCHY; do
-		IFS="$OIFS"
-		if [ -d "${DATA_DIR}/${DATA_PREFIX_DIR}" ]; then
-			debug "looking in '${DATA_DIR}/${DATA_PREFIX_DIR}'"
-			ENTRY_FILES="$(find -L "${DATA_DIR}/${DATA_PREFIX_DIR}" -type f -iname '*.desktop')"
-			while read -r ENTRY_PATH; do
-				[ -z "$ENTRY_PATH" ] && continue
-				ENTRY_FILE="${ENTRY_PATH#"${DATA_DIR}/${DATA_PREFIX_DIR}/"}"
-				FOUND_ENTRY_ID="$(printf '%s' "$ENTRY_FILE" | tr '/' '-')"
-				[ "$FOUND_ENTRY_ID" != "$ENTRY_ID" ] && continue
-				debug "got entry path '$ENTRY_PATH'"
-				printf '%s' "$ENTRY_PATH"
-				return 0
-			done <<- EOF
-				$ENTRY_FILES
-			EOF
-		fi
+	# Loop through paths, any empty lines should be discarded by word splitting
+	IFS="$N"
+	for entry_path in $ENTRY_PATHS; do
+		debug "checking entry '$entry_path'"
+		# ID is path without '$data_dir/$DATA_PREFIX_DIR//'
+		found_entry_id="${entry_path#*//}"
+		# Remove '//' from desktop entry path
+		entry_path="${entry_path%//*}"/"$found_entry_id"
+		found_entry_id="$(printf '%s' "$found_entry_id" | tr '/' '-')"
+		debug "checking entry id '$found_entry_id'"
+		[ "$found_entry_id" != "$entry_id" ] && continue
+		debug "found entry path '$entry_path'"
+		printf '%s' "$entry_path"
+		return 0
 	done
 	IFS="$OIFS"
-	debug "path not found for entry ID '$ENTRY_ID'"
+	debug 'no matching entry path found'
 	return 1
 }
 
@@ -290,11 +278,85 @@ read_entry_path() {
 	return 0
 }
 
-# See read_entry_path and check_entry
-if find_preferred_entry > /dev/null || find_any_entry > /dev/null; then
-	# Default to '-e' if unset
-	EXECARG=${EXECARG-'-e'}
-fi
+# Subfolder within $XDG_DATA_*, analoguous to 'applications/' used with desktop entry files
+DATA_PREFIX_DIR=xdg-terminals
+# Name of config files to search and read
+CONFIG_NAME=xdg-terminals.list
+
+# Directory hierarchy searched for terminal config and desktop entry files
+DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
+
+# All desktop entry paths in descending order of preference
+ENTRY_PATHS=''
+# All desktop entry ids in descending order of preference
+ENTRY_IDS=''
+
+# Generate list of possible config files for current DE
+# TODO: Should this be case insensitive? Desktop entry checks that also use $XDG_CURRENT_DESKTOP are not
+lowercase_desktops="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
+debug "lowercase desktops are: '$lowercase_desktops'"
+# All config files are searched for, and read immediatelly, rather than when out of IDs
+# This way all possible IDs are know before iterating over them, and are in order of preference
+# Further down, duplicate IDs are then removed using `awk`
+# This avoids having to use cumbersome blacklists, or fragile string operations, to deal with them
+IFS=':'
+for config_dir in $CONF_HIERARCHY; do
+	# Append read ID(s) to list, using brace expansion for better readability
+	IFS=':'
+	for desktop in $lowercase_desktops; do
+		IFS="$OIFS"
+		ENTRY_IDS="${ENTRY_IDS}${N}$(read_config_path "$config_dir"/"$desktop"-"$CONFIG_NAME")"
+	done
+	IFS="$OIFS"
+	ENTRY_IDS="${ENTRY_IDS}${N}$(read_config_path "$config_dir"/"$CONFIG_NAME")"
+done
+
+# Generate list of possible terminal entry files and also add their IDs to
+IFS=':'
+for data_dir in $DATA_HIERARCHY; do
+	IFS="$OIFS"
+	if [ -d "$data_dir"/"$DATA_PREFIX_DIR" ]; then
+		debug "searching in '$data_dir/$DATA_PREFIX_DIR'"
+		while read -r entry_path; do
+			debug "found desktop entry '$entry_path'"
+			# Remove data directory path
+			entry_path="${entry_path#"$data_dir"/"$DATA_PREFIX_DIR"/}"
+			# Create entry ID from path
+			entry_id="$(printf '%s' "$entry_path" | tr '/' '-')"
+			debug "adding matching id '$entry_id'"
+			# Append found ID to list, using brace expansion for better readability
+			ENTRY_IDS="${ENTRY_IDS}${N}${entry_id}"
+			# Prepend data directory path, and delimit its end using an extra '/' character
+			# This is done so the ID can be recreated in `find_entry_path`
+			# Other possible way of storing the data direcotry could be:
+			# $data_dir/$DATA_PREFIX_DIR/$entry_path/$entry_id
+			# Where '.desktop/' is the delimiter, as IDs do not contain '/', and entry files must end in '.desktop'
+			entry_path="$data_dir"/"$DATA_PREFIX_DIR"//"$entry_path"
+			# Append found path to list, using brace expansion for better readability
+			ENTRY_PATHS="${ENTRY_PATHS}${N}${entry_path}"
+			# Print order of found files is unpredictable, sort them
+		done <<- EOF
+			$(find -L "$data_dir"/"$DATA_PREFIX_DIR" -type f -iname '*.desktop' -print0 | sort -z | xargs -0rn 1)
+		EOF
+	fi
+done
+
+# Remove duplicate IDs
+ENTRY_IDS="$(printf '%s' "$ENTRY_IDS" | awk '!seen[$0]++')"
+debug "final entry ID list '$ENTRY_IDS'"
+
+# Loop through IDs, any empty lines should be discarded by word splitting
+IFS="$N"
+for entry_id in $ENTRY_IDS; do
+	# See read_entry_path and check_entry
+	if read_entry_path "$(find_entry_path "$entry_id")"; then
+		# Default to '-e' if unset
+		EXECARG=${EXECARG-'-e'}
+		break
+	fi
+done
+IFS="$OIFS"
 
 if [ -z "${EXEC-}" ]; then
 	# Set defaults
