@@ -10,7 +10,8 @@
 # (at your option) any later version. See <http://www.gnu.org/licenses/>.
 #
 # Contributors:
-# Roman Chistokhodov https://github.com/FreeSlave/
+# Roman Chistokhodov	https://github.com/FreeSlave/
+# fluvf 		https://github.com/fluvf
 
 # Treat non-zero exit status from simple commands as an error
 # Treat unset variables as errors when performing parameter expansion
