@@ -1,5 +1,8 @@
 #!/usr/bin/env bats
 
+# TODO: Add following tests:
+# Ensure that duplicates are removed
+
 setup() {
 	: "${XTE:=$BATS_TEST_DIRNAME/../xdg-terminal-exec}"
 	unset XDG_CURRENT_DESKTOP
