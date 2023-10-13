@@ -216,6 +216,7 @@ for data_dir in $DATA_HIERARCHY; do
 	if [ -d "$data_dir"/"$DATA_PREFIX_DIR" ]; then
 		debug "searching in '$data_dir/$DATA_PREFIX_DIR'"
 		while read -r entry_path; do
+			[ -z "$entry_path" ] && continue
 			debug "found desktop entry '$entry_path'"
 			# Remove data directory path
 			entry_path="${entry_path#"$data_dir"/"$DATA_PREFIX_DIR"/}"
@@ -234,7 +235,7 @@ for data_dir in $DATA_HIERARCHY; do
 			ENTRY_PATHS="${ENTRY_PATHS}${N}${entry_path}"
 			# Print order of found files is unpredictable, sort them
 		done <<- EOF
-			$(find -L "$data_dir"/"$DATA_PREFIX_DIR" -type f -iname '*.desktop' -print0 | sort -z | xargs -0rn 1)
+			$(find -L "$data_dir"/"$DATA_PREFIX_DIR" -type f -iname '*.desktop' -print0 | sort -z | tr '\0' '\n')
 		EOF
 	fi
 done
