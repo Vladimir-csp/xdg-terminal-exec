@@ -40,6 +40,22 @@ check_bool() {
 	esac
 }
 
+append() {
+	# returns $N-separated list $1 with $2 item appended if not already there
+	IFS="$N"
+	FOUND=0
+	while read -r ITEM; do
+		[ -n "$ITEM" ] && printf '%s\n' "$ITEM"
+		[ "$ITEM" = "$2" ] && FOUND=1
+	done <<- EOL
+		$1
+	EOL
+	if [ "$FOUND" = "0" ]; then
+		printf '%s\n' "$2"
+	fi
+	IFS="$OIFS"
+}
+
 if check_bool "${DEBUG-0}"; then
 	debug() { printf '%s\n' "$1" >&2; }
 else
@@ -163,12 +179,9 @@ check_entry() {
 # Read entry from given path, only parse 'Desktop Entry' group
 read_entry_path() {
 	entry_path="$1"
-	[ -z "$entry_path" ] && return 1
-	if [ ! -r "$entry_path" ]; then
-		debug "entry_path $entry_path is not readable"
-		return 1
-	fi
 	debug "reading desktop entry '$entry_path'"
+	# failsafe for empty entries
+	HAS_DATA=false
 	# Let `read` trim leading/trailing whitespace from the line
 	while read -r line; do
 		case $line in
@@ -176,6 +189,7 @@ read_entry_path() {
 		'[Desktop Entry]'*) ;;
 		# A `Key=Value` pair, check it
 		[A-Za-z0-9-]*)
+			HAS_DATA=true
 			check_entry "$line" && continue
 			# Reset values that might have been set
 			unset EXEC
@@ -187,7 +201,10 @@ read_entry_path() {
 		esac
 		# By default empty lines and comments get ignored
 	done < "$entry_path"
-	return 0
+	case $HAS_DATA in
+	true) return 0 ;;
+	false) return 1 ;;
+	esac
 }
 
 # Name of config files to search and read
@@ -245,23 +262,29 @@ STOCK_TERMINALS=$(
 		$ENTRY_IDS
 	EOL
 )
+
 if [ -z "$STOCK_TERMINALS" ]; then
 	debug "no stock terminals control in configs, XTE_STOCK_TERMINALS: ${XTE_STOCK_TERMINALS:-undefined}"
 	STOCK_TERMINALS=${XTE_STOCK_TERMINALS:-false}
 fi
+
 debug "STOCK_TERMINALS=$STOCK_TERMINALS"
 
-# drop special lines from ENTRY_IDS
+# drop special and empty lines from ENTRY_IDS, deduplicate
 ENTRY_IDS=$(
+	LIST=''
 	while read -r LINE; do
 		case "$LINE" in
 		use_stock_applications | use_xdg_terminals | '') continue ;;
-		*) printf '%s\n' "$LINE" ;;
+		*) LIST=$(append "$LIST" "$LINE") ;;
 		esac
 	done <<- EOL
 		$ENTRY_IDS
 	EOL
+	printf '%s' "$LIST"
 )
+
+debug "final entry ID list '$ENTRY_IDS'"
 
 # select DATA_PREFIX_DIR and entry filtering:
 # operate in separate "xdg-terminals" subdirs (default),
@@ -313,10 +336,6 @@ for data_dir in $DATA_HIERARCHY; do
 		EOF
 	fi
 done
-
-# Remove duplicate IDs
-ENTRY_IDS="$(printf '%s' "$ENTRY_IDS" | awk '!seen[$0]++')"
-debug "final entry ID list '$ENTRY_IDS'"
 
 # Loop through IDs, any empty lines should be discarded by word splitting
 IFS="$N"
