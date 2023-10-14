@@ -1,9 +1,12 @@
 # xdg-terminal-exec
+
 Proposal for XDG terminal execution utility and default terminal specification.
 
 The configuration spec is crafted in image of [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html) using different names in similar structure, governed by [basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
-Terminal emulators with their exec arguments are described by desktop entries placed in directories named `xdg-terminals` provided via XDG_DATA hierarchy.
+Terminal emulators with their exec arguments are described by desktop entries.
+Either stock entries can be used (marked by `TerminalEmulator` category),
+or separate entries placed in directories named `xdg-terminals` provided via XDG_DATA hierarchy. Selection mechanism is described below.
 
 Preferred terminals are configured in config files named `xdg-terminals.list` provided via XDG_CONFIG hierarchy.
 Format for config file is a a simple newline-separated list of desktop entries. #Comments and dangling whitespaces are trimmed.
@@ -17,7 +20,11 @@ Default paths are resolved into:
   - `/etc/xdg/xdg-terminals.list`
   - `/usr/etc/xdg/$desktop-xdg-terminals.list`
   - `/usr/etc/xdg/xdg-terminals.list`
-- data
+- data (stock)
+  - `$HOME/.local/share/applications/`
+  - `/usr/local/share/applications`
+  - `/usr/share/applications`
+- data (separate)
   - `$HOME/.local/share/xdg-terminals/`
   - `/usr/local/share/xdg-terminals`
   - `/usr/share/xdg-terminals`
@@ -25,11 +32,12 @@ Default paths are resolved into:
 Where `$desktop` is a lowercased string derived from `$XDG_CURRENT_DESKTOP`.
 If `$XDG_CURRENT_DESKTOP` is set then it contains a colon-separated list of names for the current DE.
 
-Alternative experimental mode is to use standard entries in `applications` subdirs and filter terminals by `TerminalEmulator` category.
-It can be explicitly controlled by first encountered line `use_stock_applications|use_xdg_terminals` in configs.
-Default can be set by `XTE_STOCK_TERMINALS` environment var and is normally `false`.
+Data source can be explicitly controlled by first encountered line `use_stock_applications|use_xdg_terminals` in configs.
+Default can be set by `XTE_STOCK_TERMINALS` environment var and currently is normally `false`,
+but most likely will change to `true` in the future.
 
-## Priority of selecting entry:
+## Priority of selecting entry
+
   - Read configs throughout XDG_CONFIG hierarchy.
     - in each tier `$desktop-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority
     - each entry found in configs is checked for applicability (same rules as in Desktop Entry Spec) and is skipped on failure.
@@ -37,11 +45,13 @@ Default can be set by `XTE_STOCK_TERMINALS` environment var and is normally `fal
   - If all of the above fails, `xterm` and `-e` are used.
 
 ## Desktop entry for terminal
+
 When defining terminals usual desktop entries may be used. The only addition is the key `X-ExecArg` which defines the execution argument for the terminal emulator.
 It defaults to `-e` if unset, but may be specifically set to an empty string.
 With this behavior stock entries for terminals that use `-e` as execution argument may be used unaltered.
 
 ## syntax
+
 ```
 xdg-terminal-exec [command [arguments]]
 ```
@@ -50,6 +60,7 @@ If command and its arguments are given, then values of both `Exec=` and `X-ExecA
 Run with `DEBUG=1` to see verbose messages to stderr.
 
 ## limitations
+
 There is no mechanism for handling special quoting and arguments/strings that may be required for some terminals.
 Argument array is transmitted as is.
 
