@@ -10,8 +10,8 @@
 # (at your option) any later version. See <http://www.gnu.org/licenses/>.
 #
 # Contributors:
-# Roman Chistokhodov	https://github.com/FreeSlave/
-# fluvf 		https://github.com/fluvf
+# Roman Chistokhodov    https://github.com/FreeSlave/
+# fluvf                 https://github.com/fluvf
 
 # Treat non-zero exit status from simple commands as an error
 # Treat unset variables as errors when performing parameter expansion
@@ -163,7 +163,11 @@ check_entry() {
 # Read entry from given path, only parse 'Desktop Entry' group
 read_entry_path() {
 	entry_path="$1"
-
+	[ -z "$entry_path" ] && return 1
+	if [ ! -r "$entry_path" ]; then
+		debug "entry_path $entry_path is not readable"
+		return 1
+	fi
 	debug "reading desktop entry '$entry_path'"
 	# Let `read` trim leading/trailing whitespace from the line
 	while read -r line; do
@@ -185,26 +189,6 @@ read_entry_path() {
 	done < "$entry_path"
 	return 0
 }
-
-# select DATA_PREFIX_DIR and entry filtering:
-# operate in separate "xdg-terminals" subdirs (default),
-# or filter terminals from native "applications" subdirs by category
-if check_bool "${XTE_STOCK_TERMINALS:-false}"; then
-	debug "filtering stock terminal entries from applications"
-	DATA_PREFIX_DIR=applications
-	list_entry_files() {
-		find -L "$1" -type f -iname '*.desktop' -print0 |
-			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
-			sort -z | tr '\0' '\n'
-	}
-else
-	debug "getting terminal entries from xdg-terminals"
-	DATA_PREFIX_DIR=xdg-terminals
-	list_entry_files() {
-		find -L "$1" -type f -iname '*.desktop' -print0 |
-			sort -z | tr '\0' '\n'
-	}
-fi
 
 # Name of config files to search and read
 CONFIG_NAME=xdg-terminals.list
@@ -237,6 +221,67 @@ for config_dir in $CONF_HIERARCHY; do
 	IFS="$OIFS"
 	ENTRY_IDS="${ENTRY_IDS}${N}$(read_config_path "$config_dir"/"$CONFIG_NAME")"
 done
+
+# whether to use entries in 'xdg-terminals' or stock terminals in 'applications'
+# decide by checking for special lines in configs
+# default is governed by XTE_STOCK_TERMINALS
+STOCK_TERMINALS=$(
+	# find special parameters in ENTRY_IDS
+	while read -r LINE; do
+		case "$LINE" in
+		# special parameters to control data subdir and entry filtering
+		use_stock_applications)
+			debug "encountered use_stock_applications"
+			echo true
+			break
+			;;
+		use_xdg_terminals)
+			debug "encountered use_xdg_terminals"
+			echo false
+			break
+			;;
+		esac
+	done <<- EOL
+		$ENTRY_IDS
+	EOL
+)
+if [ -z "$STOCK_TERMINALS" ]; then
+	debug "no stock terminals control in configs, XTE_STOCK_TERMINALS: ${XTE_STOCK_TERMINALS:-undefined}"
+	STOCK_TERMINALS=${XTE_STOCK_TERMINALS:-false}
+fi
+debug "STOCK_TERMINALS=$STOCK_TERMINALS"
+
+# drop special lines from ENTRY_IDS
+ENTRY_IDS=$(
+	while read -r LINE; do
+		case "$LINE" in
+		use_stock_applications | use_xdg_terminals | '') continue ;;
+		*) printf '%s\n' "$LINE" ;;
+		esac
+	done <<- EOL
+		$ENTRY_IDS
+	EOL
+)
+
+# select DATA_PREFIX_DIR and entry filtering:
+# operate in separate "xdg-terminals" subdirs (default),
+# or filter terminals from native "applications" subdirs by category
+if check_bool "$STOCK_TERMINALS"; then
+	debug "filtering stock terminal entries from applications"
+	DATA_PREFIX_DIR=applications
+	list_entry_files() {
+		find -L "$1" -type f -iname '*.desktop' -print0 |
+			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
+			sort -z | tr '\0' '\n'
+	}
+else
+	debug "getting terminal entries from xdg-terminals"
+	DATA_PREFIX_DIR=xdg-terminals
+	list_entry_files() {
+		find -L "$1" -type f -iname '*.desktop' -print0 |
+			sort -z | tr '\0' '\n'
+	}
+fi
 
 # Generate list of possible terminal entry files and also add their IDs to
 IFS=':'

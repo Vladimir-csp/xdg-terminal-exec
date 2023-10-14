@@ -25,8 +25,9 @@ Default paths are resolved into:
 Where `$desktop` is a lowercased string derived from `$XDG_CURRENT_DESKTOP`.
 If `$XDG_CURRENT_DESKTOP` is set then it contains a colon-separated list of names for the current DE.
 
-Alternative experimental mode enabled by setting `XTE_STOCK_TERMINALS=true` will use standard entries in `applications` subdirs
-and filter terminals by `TerminalEmulator` category.
+Alternative experimental mode is to use standard entries in `applications` subdirs and filter terminals by `TerminalEmulator` category.
+It can be explicitly controlled by first encountered line `use_stock_applications|use_xdg_terminals` in configs.
+Default can be set by `XTE_STOCK_TERMINALS` environment var and is normally `false`.
 
 ## Priority of selecting entry:
   - Read configs throughout XDG_CONFIG hierarchy.
