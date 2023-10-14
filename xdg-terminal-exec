@@ -24,16 +24,27 @@ OIFS="$IFS"
 N='
 '
 
-if [ "${DEBUG-0}" = '1' ]; then
-	debug() { printf '%s\n' "$1" >&2; }
-else
-	debug() { :; }
-fi
-
 trim_start() {
 	# Remove all but leading whitespace, and trim that from the given string
 	printf '%s' "${1#"${1%%[![:space:]]*}"}"
 }
+
+check_bool() {
+	case "$1" in
+	true | True | TRUE | yes | Yes | YES | 1) return 0 ;;
+	false | False | FALSE | no | No | NO | 0) return 1 ;;
+	*)
+		echo "Assuming \"$1\" means no" >&2
+		return 1
+		;;
+	esac
+}
+
+if check_bool "${DEBUG-0}"; then
+	debug() { printf '%s\n' "$1" >&2; }
+else
+	debug() { :; }
+fi
 
 # Read config from given path, print sanitised entries
 read_config_path() {
@@ -178,23 +189,22 @@ read_entry_path() {
 # select DATA_PREFIX_DIR and entry filtering:
 # operate in separate "xdg-terminals" subdirs (default),
 # or filter terminals from native "applications" subdirs by category
-case "${XTE_STOCK_TERMINALS:-false}" in
-true | True | TRUE | yes | Yes | YES | 1)
+if check_bool "${XTE_STOCK_TERMINALS:-false}"; then
+	debug "filtering stock terminal entries from applications"
 	DATA_PREFIX_DIR=applications
 	list_entry_files() {
 		find -L "$1" -type f -iname '*.desktop' -print0 |
 			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
 			sort -z | tr '\0' '\n'
 	}
-	;;
-false | False | FALSE | no | No | NO | 0)
+else
+	debug "getting terminal entries from xdg-terminals"
 	DATA_PREFIX_DIR=xdg-terminals
 	list_entry_files() {
 		find -L "$1" -type f -iname '*.desktop' -print0 |
 			sort -z | tr '\0' '\n'
 	}
-	;;
-esac
+fi
 
 # Name of config files to search and read
 CONFIG_NAME=xdg-terminals.list
