@@ -25,6 +25,9 @@ Default paths are resolved into:
 Where `$desktop` is a lowercased string derived from `$XDG_CURRENT_DESKTOP`.
 If `$XDG_CURRENT_DESKTOP` is set then it contains a colon-separated list of names for the current DE.
 
+Alternative experimental mode enabled by setting `XTE_STOCK_TERMINALS=true` will use standard entries in `applications` subdirs
+and filter terminals by `TerminalEmulator` category.
+
 ## Priority of selecting entry:
   - Read configs throughout XDG_CONFIG hierarchy.
     - in each tier `$desktop-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority

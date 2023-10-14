@@ -175,8 +175,27 @@ read_entry_path() {
 	return 0
 }
 
-# Subfolder within $XDG_DATA_*, analoguous to 'applications/' used with desktop entry files
-DATA_PREFIX_DIR=xdg-terminals
+# select DATA_PREFIX_DIR and entry filtering:
+# operate in separate "xdg-terminals" subdirs (default),
+# or filter terminals from native "applications" subdirs by category
+case "${XTE_STOCK_TERMINALS:-false}" in
+true | True | TRUE | yes | Yes | YES | 1)
+	DATA_PREFIX_DIR=applications
+	list_entry_files() {
+		find -L "$1" -type f -iname '*.desktop' -print0 |
+			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
+			sort -z | tr '\0' '\n'
+	}
+	;;
+false | False | FALSE | no | No | NO | 0)
+	DATA_PREFIX_DIR=xdg-terminals
+	list_entry_files() {
+		find -L "$1" -type f -iname '*.desktop' -print0 |
+			sort -z | tr '\0' '\n'
+	}
+	;;
+esac
+
 # Name of config files to search and read
 CONFIG_NAME=xdg-terminals.list
 
@@ -235,7 +254,7 @@ for data_dir in $DATA_HIERARCHY; do
 			ENTRY_PATHS="${ENTRY_PATHS}${N}${entry_path}"
 			# Print order of found files is unpredictable, sort them
 		done <<- EOF
-			$(find -L "$data_dir"/"$DATA_PREFIX_DIR" -type f -iname '*.desktop' -print0 | sort -z | tr '\0' '\n')
+			$(list_entry_files "$data_dir"/"$DATA_PREFIX_DIR")
 		EOF
 	fi
 done
