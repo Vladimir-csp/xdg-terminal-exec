@@ -212,8 +212,8 @@ read_entry_path() {
 CONFIG_NAME=xdg-terminals.list
 
 # Directory hierarchy searched for terminal config and desktop entry files
-DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
+DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
+CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
 
 # All desktop entry paths in descending order of preference
 ENTRY_PATHS=''
@@ -230,6 +230,8 @@ debug "lowercase desktops are: '$lowercase_desktops'"
 # This avoids having to use cumbersome blacklists, or fragile string operations, to deal with them
 IFS=':'
 for config_dir in $CONF_HIERARCHY; do
+	# Remove trailing '/' from base path
+	config_dir=${config_dir%/}
 	# Append read ID(s) to list, using brace expansion for better readability
 	IFS=':'
 	for desktop in $lowercase_desktops; do
@@ -310,6 +312,8 @@ fi
 # Generate list of possible terminal entry files and also add their IDs to
 IFS=':'
 for data_dir in $DATA_HIERARCHY; do
+	# Remove trailing '/' from base path
+	data_dir=${data_dir%/}
 	IFS="$OIFS"
 	if [ -d "$data_dir"/"$DATA_PREFIX_DIR" ]; then
 		debug "searching in '$data_dir/$DATA_PREFIX_DIR'"
