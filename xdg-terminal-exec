@@ -139,9 +139,29 @@ find_entry_path() {
 # Modifies following global variables:
 # EXEC : Program to execute, possibly with arguments. See spec for details.
 # EXECARG : Execution argument for the terminal emulator.
+# TERMINAL : Set if application has been categorised as a terminal emulator
 check_entry() {
 	# Order of checks is important
 	case $1 in
+	'Categories'*=*)
+		# Enforce only if reading from 'applications' subdirectory
+		! check_bool "${XTE_STOCK_TERMINALS-false}" && return 0
+		categories=$(trim_start "${1#*=}")
+		debug "read Categories '$categories'"
+		IFS=';'
+		for category in $categories; do
+			if [ "$category" = 'TerminalEmulator' ]; then
+				debug "entry categorised as a Terminal Emulator"
+				# Set global variable
+				TERMINAL=true
+				IFS="$OIFS"
+				return 0
+			fi
+		done
+		IFS="$OIFS"
+		# Default in this case is to fail
+		return 1
+		;;
 	'OnlyShowIn'*=*)
 		onlyShowIn=$(trim_start "${1#*=}")
 		debug "read OnlyShowIn '$onlyShowIn'"
@@ -225,6 +245,7 @@ read_entry_path() {
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
+			unset TERMINAL
 			return 1
 			;;
 		# Start of the next group header, stop
@@ -264,24 +285,21 @@ ENTRY_IDS=$(
 
 debug "final entry ID list '$ENTRY_IDS'"
 
-# select DATA_PREFIX_DIR and entry filtering:
-# operate in separate "xdg-terminals" subdirs (default),
-# or filter terminals from native "applications" subdirs by category
+# Select which subdirectory to search for terminal emulators in:
+# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
+# 'applications', the standardised location for application desktop entry files
+# When searching in 'applications', entries will be filtered based on their Category key
 if check_bool "${XTE_STOCK_TERMINALS-false}"; then
-	debug "filtering stock terminal entries from applications"
 	DATA_PREFIX_DIR=applications
-	list_entry_files() {
-		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' |
-			xargs -r grep -lE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
-			sort
-	}
 else
-	debug "getting terminal entries from xdg-terminals"
 	DATA_PREFIX_DIR=xdg-terminals
-	list_entry_files() {
-		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' | sort
-	}
 fi
+
+list_entry_files() {
+	find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' | sort
+}
+
+debug "searching for terminal entries in '$DATA_PREFIX_DIR'"
 
 # Generate list of possible terminal entry files and also add their IDs to
 IFS=':'
@@ -315,12 +333,15 @@ for data_dir in $DATA_HIERARCHY; do
 		EOF
 	fi
 done
+IFS="$OIFS"
 
 # Loop through IDs, any empty lines should be discarded by word splitting
 IFS="$N"
 for entry_id in $ENTRY_IDS; do
 	# See read_entry_path and check_entry
 	if read_entry_path "$(find_entry_path "$entry_id")"; then
+		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator
+		check_bool "${XTE_STOCK_TERMINALS-false}" && [ -z "${TERMINAL-}" ] && continue
 		# Default to '-e' if unset
 		EXECARG=${EXECARG-'-e'}
 		break
