@@ -296,16 +296,15 @@ if check_bool "$STOCK_TERMINALS"; then
 	debug "filtering stock terminal entries from applications"
 	DATA_PREFIX_DIR=applications
 	list_entry_files() {
-		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' -print0 |
-			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
-			sort -z | tr '\0' '\n'
+		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' |
+			xargs -r grep -lE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
+			sort
 	}
 else
 	debug "getting terminal entries from xdg-terminals"
 	DATA_PREFIX_DIR=xdg-terminals
 	list_entry_files() {
-		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' -print0 |
-			sort -z | tr '\0' '\n'
+		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' | sort
 	}
 fi
 
