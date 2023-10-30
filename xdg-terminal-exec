@@ -63,6 +63,27 @@ else
 	debug() { :; }
 fi
 
+# Find and print all config file paths
+find_config_paths() {
+	# Directories searched for config files, in decending order of preference
+	config_directories="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
+	# Config filename to parse
+	config_file=xdg-terminals.list
+	# Generate list of possible config files for current Dekstop Environment
+	# TODO: Should this be case insensitive? Desktop entry checks that also use $XDG_CURRENT_DESKTOP are not
+	lowercase_desktops="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
+	debug "lowercase desktops are: '$lowercase_desktops'"
+	# Loop through paths
+	# TODO: Replace this by a find call?
+	IFS=':'
+	for directory in $config_directories; do
+		for desktop in $lowercase_desktops; do
+			printf '%s\n' "$directory"/"$desktop"-"$config_file"
+		done
+		printf '%s\n' "$directory"/"$config_file"
+	done
+}
+
 # Read config from given path, print sanitised entries
 read_config_path() {
 	config_path="$1"
@@ -208,38 +229,21 @@ read_entry_path() {
 	esac
 }
 
-# Name of config files to search and read
-CONFIG_NAME=xdg-terminals.list
-
-# Directory hierarchy searched for terminal config and desktop entry files
+# Directory hierarchy searched for desktop entry files
 DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
-CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
 
 # All desktop entry paths in descending order of preference
 ENTRY_PATHS=''
 # All desktop entry ids in descending order of preference
 ENTRY_IDS=''
 
-# Generate list of possible config files for current DE
-# TODO: Should this be case insensitive? Desktop entry checks that also use $XDG_CURRENT_DESKTOP are not
-lowercase_desktops="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
-debug "lowercase desktops are: '$lowercase_desktops'"
-# All config files are searched for, and read immediatelly, rather than when out of IDs
-# This way all possible IDs are know before iterating over them, and are in order of preference
-# Further down, duplicate IDs are then removed using `awk`
-# This avoids having to use cumbersome blacklists, or fragile string operations, to deal with them
-IFS=':'
-for config_dir in $CONF_HIERARCHY; do
-	# Remove trailing '/' from base path
-	config_dir=${config_dir%/}
+# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
+# This way all IDs are already known, and in order of preference, before iterating over them
+# This allows for easier deduplication, when adding fallback IDs later on
+IFS="$N"
+for config_path in $(find_config_paths); do
 	# Append read ID(s) to list, using brace expansion for better readability
-	IFS=':'
-	for desktop in $lowercase_desktops; do
-		IFS="$OIFS"
-		ENTRY_IDS="${ENTRY_IDS}${N}$(read_config_path "$config_dir"/"$desktop"-"$CONFIG_NAME")"
-	done
-	IFS="$OIFS"
-	ENTRY_IDS="${ENTRY_IDS}${N}$(read_config_path "$config_dir"/"$CONFIG_NAME")"
+	ENTRY_IDS=${ENTRY_IDS}${N}$(read_config_path "$config_path")
 done
 
 # whether to use entries in 'xdg-terminals' or stock terminals in 'applications'
