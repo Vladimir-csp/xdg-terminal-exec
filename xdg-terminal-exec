@@ -15,7 +15,8 @@
 
 # Treat non-zero exit status from simple commands as an error
 # Treat unset variables as errors when performing parameter expansion
-set -eu
+# Disable pathname expansion
+set -euf
 
 # Backup original IFS value
 # It is assumed that $OIFS contains the default IFS value
@@ -211,8 +212,8 @@ read_entry_path() {
 CONFIG_NAME=xdg-terminals.list
 
 # Directory hierarchy searched for terminal config and desktop entry files
-DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg:/usr/etc/xdg}"
+DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
+CONF_HIERARCHY="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
 
 # All desktop entry paths in descending order of preference
 ENTRY_PATHS=''
@@ -229,6 +230,8 @@ debug "lowercase desktops are: '$lowercase_desktops'"
 # This avoids having to use cumbersome blacklists, or fragile string operations, to deal with them
 IFS=':'
 for config_dir in $CONF_HIERARCHY; do
+	# Remove trailing '/' from base path
+	config_dir=${config_dir%/}
 	# Append read ID(s) to list, using brace expansion for better readability
 	IFS=':'
 	for desktop in $lowercase_desktops; do
@@ -293,22 +296,23 @@ if check_bool "$STOCK_TERMINALS"; then
 	debug "filtering stock terminal entries from applications"
 	DATA_PREFIX_DIR=applications
 	list_entry_files() {
-		find -L "$1" -type f -iname '*.desktop' -print0 |
-			xargs -0r grep -ZlE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
-			sort -z | tr '\0' '\n'
+		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' |
+			xargs -r grep -lE '^[[:space:]]*Categories[[:space:]]*=[[:space:]]*(.*;)?TerminalEmulator(;|$)' |
+			sort
 	}
 else
 	debug "getting terminal entries from xdg-terminals"
 	DATA_PREFIX_DIR=xdg-terminals
 	list_entry_files() {
-		find -L "$1" -type f -iname '*.desktop' -print0 |
-			sort -z | tr '\0' '\n'
+		find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' | sort
 	}
 fi
 
 # Generate list of possible terminal entry files and also add their IDs to
 IFS=':'
 for data_dir in $DATA_HIERARCHY; do
+	# Remove trailing '/' from base path
+	data_dir=${data_dir%/}
 	IFS="$OIFS"
 	if [ -d "$data_dir"/"$DATA_PREFIX_DIR" ]; then
 		debug "searching in '$data_dir/$DATA_PREFIX_DIR'"
