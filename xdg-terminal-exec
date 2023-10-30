@@ -84,21 +84,25 @@ find_config_paths() {
 	done
 }
 
-# Read config from given path, print sanitised entries
-read_config_path() {
-	config_path="$1"
-
-	debug "reading config '$config_path'"
-	[ -f "$config_path" ] || return 0
-	# Let `read` trim leading/trailing whitespace from the line
-	while read -r line; do
-		debug "read line '$line'"
-		case $line in
-		# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
-		[A-Za-z_]*) printf '%s\n' "$line" ;;
-		esac
-		# By default empty lines and comments get ignored
-	done < "$config_path"
+# Parse all config files and populate $ENTRY_IDS with read desktop entry IDs
+read_config_paths() {
+	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
+	# This way all IDs are already known, and in order of preference, before iterating over them
+	# This allows for easier deduplication, when adding fallback IDs later on
+	IFS="$N"
+	for config_path in $(find_config_paths); do
+		debug "reading config '$config_path'"
+		[ -f "$config_path" ] || continue
+		# Let `read` trim leading/trailing whitespace from the line
+		while IFS="$OIFS" read -r line; do
+			debug "read line '$line'"
+			case $line in
+			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
+			[A-Za-z_]*) ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line ;;
+			esac
+			# By default empty lines and comments get ignored
+		done < "$config_path"
+	done
 }
 
 # Find a matching file path for a given entry ID
@@ -236,15 +240,8 @@ DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local
 ENTRY_PATHS=''
 # All desktop entry ids in descending order of preference
 ENTRY_IDS=''
-
-# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
-# This way all IDs are already known, and in order of preference, before iterating over them
-# This allows for easier deduplication, when adding fallback IDs later on
-IFS="$N"
-for config_path in $(find_config_paths); do
-	# Append read ID(s) to list, using brace expansion for better readability
-	ENTRY_IDS=${ENTRY_IDS}${N}$(read_config_path "$config_path")
-done
+# Modifies $ENTRY_IDS
+read_config_paths
 
 # whether to use entries in 'xdg-terminals' or stock terminals in 'applications'
 # decide by checking for special lines in configs
