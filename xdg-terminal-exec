@@ -92,11 +92,16 @@ read_config_paths() {
 	IFS="$N"
 	for config_path in $(find_config_paths); do
 		debug "reading config '$config_path'"
+		# Nonexistant file is not an error
 		[ -f "$config_path" ] || continue
 		# Let `read` trim leading/trailing whitespace from the line
 		while IFS="$OIFS" read -r line; do
 			debug "read line '$line'"
 			case $line in
+			# Whether to search for entries in 'xdg-terminals' or 'applications'
+			# Can be overriden by $XTE_STOCK_TERMINALS
+			use_stock_applications) XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-true} ;;
+			use_xdg_terminals) XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-false} ;;
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
 			[A-Za-z_]*) ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line ;;
 			esac
@@ -243,43 +248,12 @@ ENTRY_IDS=''
 # Modifies $ENTRY_IDS
 read_config_paths
 
-# whether to use entries in 'xdg-terminals' or stock terminals in 'applications'
-# decide by checking for special lines in configs
-# default is governed by XTE_STOCK_TERMINALS
-STOCK_TERMINALS=$(
-	# find special parameters in ENTRY_IDS
-	while read -r LINE; do
-		case "$LINE" in
-		# special parameters to control data subdir and entry filtering
-		use_stock_applications)
-			debug "encountered use_stock_applications"
-			echo true
-			break
-			;;
-		use_xdg_terminals)
-			debug "encountered use_xdg_terminals"
-			echo false
-			break
-			;;
-		esac
-	done <<- EOL
-		$ENTRY_IDS
-	EOL
-)
-
-if [ -z "$STOCK_TERMINALS" ]; then
-	debug "no stock terminals control in configs, XTE_STOCK_TERMINALS: ${XTE_STOCK_TERMINALS:-undefined}"
-	STOCK_TERMINALS=${XTE_STOCK_TERMINALS:-false}
-fi
-
-debug "STOCK_TERMINALS=$STOCK_TERMINALS"
-
-# drop special and empty lines from ENTRY_IDS, deduplicate
+# drop empty lines from ENTRY_IDS, deduplicate
 ENTRY_IDS=$(
 	LIST=''
 	while read -r LINE; do
 		case "$LINE" in
-		use_stock_applications | use_xdg_terminals | '') continue ;;
+		'') continue ;;
 		*) LIST=$(append "$LIST" "$LINE") ;;
 		esac
 	done <<- EOL
@@ -293,7 +267,7 @@ debug "final entry ID list '$ENTRY_IDS'"
 # select DATA_PREFIX_DIR and entry filtering:
 # operate in separate "xdg-terminals" subdirs (default),
 # or filter terminals from native "applications" subdirs by category
-if check_bool "$STOCK_TERMINALS"; then
+if check_bool "${XTE_STOCK_TERMINALS-false}"; then
 	debug "filtering stock terminal entries from applications"
 	DATA_PREFIX_DIR=applications
 	list_entry_files() {
