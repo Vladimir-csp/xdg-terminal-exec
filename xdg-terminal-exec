@@ -41,22 +41,6 @@ check_bool() {
 	esac
 }
 
-append() {
-	# returns $N-separated list $1 with $2 item appended if not already there
-	IFS="$N"
-	FOUND=0
-	while read -r ITEM; do
-		[ -n "$ITEM" ] && printf '%s\n' "$ITEM"
-		[ "$ITEM" = "$2" ] && FOUND=1
-	done <<- EOL
-		$1
-	EOL
-	if [ "$FOUND" = "0" ]; then
-		printf '%s\n' "$2"
-	fi
-	IFS="$OIFS"
-}
-
 if check_bool "${DEBUG-0}"; then
 	debug() { printf '%s\n' "$1" >&2; }
 else
@@ -107,6 +91,58 @@ read_config_paths() {
 			esac
 			# By default empty lines and comments get ignored
 		done < "$config_path"
+	done
+}
+
+# Check if newline delimited list $1 contains string $2
+contains() {
+	IFS="$N"
+	for item in $1; do
+		[ "$item" = "$2" ] && return 0
+	done
+	return 1
+}
+
+# Find all desktop entry files from standardised paths, populate $ENTRY_PATHS and add fallback IDs
+find_entry_paths() {
+	# Directory hierarchy that is searched for desktop entry files
+	data_directories="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
+	# Select which subdirectory to search for terminal emulators in:
+	# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
+	# 'applications', the standardised location for application desktop entry files
+	# When searching in 'applications', entries will be filtered based on their Category key
+	if check_bool "${XTE_STOCK_TERMINALS-false}"; then
+		data_subdirectory='applications'
+	else
+		data_subdirectory='xdg-terminals'
+	fi
+	debug "searching for terminal entries in '$data_subdirectory'"
+	# Loop through paths
+	IFS=':'
+	for directory in $data_directories; do
+		# Normalise base path and append the data subdirectory with a trailing '/'
+		directory=${directory%/}/$data_subdirectory/
+		debug "searching '$directory'"
+		# Nonexistent directory is not an error
+		[ -d "$directory" ] || continue
+		# Loop through paths
+		IFS="$N"
+		# Print order of found files is unpredictable, sort them
+		for entry_path in $(find -L "$directory" -type f -name '[[:alnum:]-_.]*.desktop' | sort); do
+			debug "found desktop entry '$entry_path'"
+			# Create entry ID from path
+			entry_path=${entry_path#"$directory"}
+			entry_id=$(printf '%s' "$entry_path" | tr '/' '-')
+			# Do not add duplicate IDs
+			if ! contains "$ENTRY_IDS" "$entry_id"; then
+				debug "adding fallback ID '$entry_id'"
+				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
+			fi
+			# Delimit end of the data directory path by adding an extra '/' character
+			# This is done so the ID can be recreated later
+			entry_path="$directory"/"$entry_path"
+			ENTRY_PATHS=${ENTRY_PATHS:+${ENTRY_PATHS}${N}}$entry_path
+		done
 	done
 }
 
@@ -259,81 +295,17 @@ read_entry_path() {
 	esac
 }
 
-# Directory hierarchy searched for desktop entry files
-DATA_HIERARCHY="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
-
-# All desktop entry paths in descending order of preference
-ENTRY_PATHS=''
 # All desktop entry ids in descending order of preference
 ENTRY_IDS=''
 # Modifies $ENTRY_IDS
 read_config_paths
-
-# drop empty lines from ENTRY_IDS, deduplicate
-ENTRY_IDS=$(
-	LIST=''
-	while read -r LINE; do
-		case "$LINE" in
-		'') continue ;;
-		*) LIST=$(append "$LIST" "$LINE") ;;
-		esac
-	done <<- EOL
-		$ENTRY_IDS
-	EOL
-	printf '%s' "$LIST"
-)
+# All desktop entry paths in descending order of preference
+ENTRY_PATHS=''
+# Modifies $ENTRY_PATHS and $ENTRY_IDS
+find_entry_paths
 
 debug "final entry ID list '$ENTRY_IDS'"
-
-# Select which subdirectory to search for terminal emulators in:
-# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
-# 'applications', the standardised location for application desktop entry files
-# When searching in 'applications', entries will be filtered based on their Category key
-if check_bool "${XTE_STOCK_TERMINALS-false}"; then
-	DATA_PREFIX_DIR=applications
-else
-	DATA_PREFIX_DIR=xdg-terminals
-fi
-
-list_entry_files() {
-	find -L "$1" -type f -name '[[:alnum:]-_.]*.desktop' | sort
-}
-
-debug "searching for terminal entries in '$DATA_PREFIX_DIR'"
-
-# Generate list of possible terminal entry files and also add their IDs to
-IFS=':'
-for data_dir in $DATA_HIERARCHY; do
-	# Remove trailing '/' from base path
-	data_dir=${data_dir%/}
-	IFS="$OIFS"
-	if [ -d "$data_dir"/"$DATA_PREFIX_DIR" ]; then
-		debug "searching in '$data_dir/$DATA_PREFIX_DIR'"
-		while read -r entry_path; do
-			[ -z "$entry_path" ] && continue
-			debug "found desktop entry '$entry_path'"
-			# Remove data directory path
-			entry_path="${entry_path#"$data_dir"/"$DATA_PREFIX_DIR"/}"
-			# Create entry ID from path
-			entry_id="$(printf '%s' "$entry_path" | tr '/' '-')"
-			debug "adding matching id '$entry_id'"
-			# Append found ID to list, using brace expansion for better readability
-			ENTRY_IDS="${ENTRY_IDS}${N}${entry_id}"
-			# Prepend data directory path, and delimit its end using an extra '/' character
-			# This is done so the ID can be recreated in `find_entry_path`
-			# Other possible way of storing the data direcotry could be:
-			# $data_dir/$DATA_PREFIX_DIR/$entry_path/$entry_id
-			# Where '.desktop/' is the delimiter, as IDs do not contain '/', and entry files must end in '.desktop'
-			entry_path="$data_dir"/"$DATA_PREFIX_DIR"//"$entry_path"
-			# Append found path to list, using brace expansion for better readability
-			ENTRY_PATHS="${ENTRY_PATHS}${N}${entry_path}"
-			# Print order of found files is unpredictable, sort them
-		done <<- EOF
-			$(list_entry_files "$data_dir"/"$DATA_PREFIX_DIR")
-		EOF
-	fi
-done
-IFS="$OIFS"
+debug "final entry path list '$ENTRY_PATHS'"
 
 # Loop through IDs, any empty lines should be discarded by word splitting
 IFS="$N"
