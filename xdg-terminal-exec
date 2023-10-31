@@ -147,9 +147,9 @@ find_entry_paths() {
 }
 
 # Find a matching file path for a given entry ID
-find_entry_path() {
+match_entry_path() {
 	entry_id="$1"
-	debug "finding path for entry id '$entry_id'"
+	debug "matching path for entry id '$entry_id'"
 
 	# Loop through paths, any empty lines should be discarded by word splitting
 	IFS="$N"
@@ -161,6 +161,8 @@ find_entry_path() {
 		entry_path="${entry_path%//*}"/"$found_entry_id"
 		found_entry_id="$(printf '%s' "$found_entry_id" | tr '/' '-')"
 		debug "checking entry id '$found_entry_id'"
+		# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
+		# For simplicity, the first ID encountered is the one used
 		[ "$found_entry_id" != "$entry_id" ] && continue
 		debug "found entry path '$entry_path'"
 		printf '%s' "$entry_path"
@@ -267,8 +269,6 @@ check_entry() {
 read_entry_path() {
 	entry_path="$1"
 	debug "reading desktop entry '$entry_path'"
-	# failsafe for empty entries
-	HAS_DATA=false
 	# Let `read` trim leading/trailing whitespace from the line
 	while read -r line; do
 		case $line in
@@ -276,7 +276,6 @@ read_entry_path() {
 		'[Desktop Entry]'*) ;;
 		# A `Key=Value` pair, check it
 		[A-Za-z0-9-]*)
-			HAS_DATA=true
 			check_entry "$line" && continue
 			# Reset values that might have been set
 			unset EXEC
@@ -289,10 +288,25 @@ read_entry_path() {
 		esac
 		# By default empty lines and comments get ignored
 	done < "$entry_path"
-	case $HAS_DATA in
-	true) return 0 ;;
-	false) return 1 ;;
-	esac
+}
+
+# Loop through IDs and try to find a valid entry
+find_entry() {
+	IFS="$N"
+	for entry_id in $ENTRY_IDS; do
+		# Find matching entry
+		entry_path=$(match_entry_path "$entry_id")
+		# Validate entry
+		read_entry_path "$entry_path" || continue
+		# Check that the entry is actually executable
+		[ -z "${EXEC-}" ] && continue
+		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator
+		[ "${XTE_STOCK_TERMINALS-}" = 'true' ] && [ -z "${TERMINAL-}" ] && continue
+		# Entry is valid, stop
+		return 0
+	done
+	# No valid entry was found
+	return 1
 }
 
 # All desktop entry ids in descending order of preference
@@ -307,25 +321,11 @@ find_entry_paths
 debug "final entry ID list '$ENTRY_IDS'"
 debug "final entry path list '$ENTRY_PATHS'"
 
-# Loop through IDs, any empty lines should be discarded by word splitting
-IFS="$N"
-for entry_id in $ENTRY_IDS; do
-	# See read_entry_path and check_entry
-	if read_entry_path "$(find_entry_path "$entry_id")"; then
-		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator
-		check_bool "${XTE_STOCK_TERMINALS-false}" && [ -z "${TERMINAL-}" ] && continue
-		# Default to '-e' if unset
-		EXECARG=${EXECARG-'-e'}
-		break
-	fi
-done
-IFS="$OIFS"
+find_entry || true
 
-if [ -z "${EXEC-}" ]; then
-	# Set defaults
-	EXEC='xterm'
-	EXECARG='-e'
-fi
+# Set defaults
+: "${EXEC="xterm"}"
+: "${EXECARG="-e"}"
 
 # Store original argument list, before it's modified
 ORIG_ARGV="$*"
