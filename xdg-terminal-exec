@@ -25,11 +25,6 @@ OIFS="$IFS"
 N='
 '
 
-trim_start() {
-	# Remove all but leading whitespace, and trim that from the given string
-	printf '%s' "${1#"${1%%[![:space:]]*}"}"
-}
-
 check_bool() {
 	case "$1" in
 	true | True | TRUE | yes | Yes | YES | 1) return 0 ;;
@@ -173,21 +168,23 @@ match_entry_path() {
 	return 1
 }
 
-# Check validity of a given entry line
+# Check validity of a given entry key - value pair
 # Modifies following global variables:
 # EXEC : Program to execute, possibly with arguments. See spec for details.
 # EXECARG : Execution argument for the terminal emulator.
 # TERMINAL : Set if application has been categorised as a terminal emulator
-check_entry() {
+check_entry_key() {
+	key="$1"
+	value="$2"
+
 	# Order of checks is important
-	case $1 in
+	case $key in
 	'Categories'*=*)
 		# Enforce only if reading from 'applications' subdirectory
 		! check_bool "${XTE_STOCK_TERMINALS-false}" && return 0
-		categories=$(trim_start "${1#*=}")
-		debug "read Categories '$categories'"
+		debug "read Categories '$value'"
 		IFS=';'
-		for category in $categories; do
+		for category in $value; do
 			if [ "$category" = 'TerminalEmulator' ]; then
 				debug "entry categorised as a Terminal Emulator"
 				# Set global variable
@@ -201,15 +198,14 @@ check_entry() {
 		return 1
 		;;
 	'OnlyShowIn'*=*)
-		onlyShowIn=$(trim_start "${1#*=}")
-		debug "read OnlyShowIn '$onlyShowIn'"
+		debug "read OnlyShowIn '$value'"
 		IFS=';'
-		for name in $onlyShowIn; do
+		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
 				IFS="$OIFS"
-				debug "checking OnlyShowIn match '$desktop'='$name'"
-				[ "$desktop" = "$name" ] && return 0
+				debug "checking OnlyShowIn match '$desktop'='$target'"
+				[ "$desktop" = "$target" ] && return 0
 			done
 		done
 		IFS="$OIFS"
@@ -217,49 +213,40 @@ check_entry() {
 		return 1
 		;;
 	'NotShowIn'*=*)
-		notShowIn=$(trim_start "${1#*=}")
-		debug "read NotShowIn '$notShowIn'"
+		debug "read NotShowIn '$value'"
 		IFS=';'
-		for name in $notShowIn; do
+		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
 				IFS="$OIFS"
-				debug "checking NotShowIn match '$desktop'='$name'"
-				[ "$desktop" = "$name" ] && return 1
+				debug "checking NotShowIn match '$desktop'='$target'"
+				[ "$desktop" = "$target" ] && return 1
 			done
 		done
 		IFS="$OIFS"
 		# Default in this case is to succeed
 		return 0
 		;;
-	'X-ExecArg'*=*)
+	'X-ExecArg'*=* | 'ExecArg'*=*)
 		# Set global variable
-		EXECARG=$(trim_start "${1#*=}")
-		debug "read execution argument '$EXECARG'"
-		;;
-	'ExecArg'*=*)
-		# Set global variable
-		EXECARG=$(trim_start "${1#*=}")
+		EXECARG=$value
 		debug "read execution argument '$EXECARG'"
 		;;
 	'TryExec'*=*)
-		executable=$(trim_start "${1#*=}")
-		debug "checking TryExec executable '$executable'"
-		command -v "$executable" > /dev/null || return 1
+		debug "checking TryExec executable '$value'"
+		command -v "$value" > /dev/null || return 1
 		;;
 	'Hidden'*=*)
-		hidden=$(trim_start "${1#*=}")
-		debug "checking Hidden boolean '$hidden'"
-		[ "$hidden" = 'true' ] && return 1
+		debug "checking Hidden boolean '$value'"
+		[ "$value" = 'true' ] && return 1
 		;;
 	'Exec'*=*)
 		# Set global variable
-		EXEC=$(trim_start "${1#*=}")
+		EXEC=$value
 		# Get first word from read Exec value
 		eval "set -- $EXEC"
-		exec0="$1"
-		debug "checking Exec[0] executable '$exec0'"
-		command -v "$exec0" > /dev/null || return 1
+		debug "checking Exec[0] executable '$1'"
+		command -v "$1" > /dev/null || return 1
 		;;
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
@@ -274,9 +261,14 @@ read_entry_path() {
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
 		'[Desktop Entry]'*) ;;
-		# A `Key=Value` pair, check it
+		# A `Key=Value` pair
 		[A-Za-z0-9-]*)
-			check_entry "$line" && continue
+			# Split value from pair
+			value=${line#*=}
+			# Remove all but leading spaces, and trim that from the value
+			value=${value#"${value%%[! ]*}"}
+			# Check the key
+			check_entry_key "$line" "$value" && continue
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
