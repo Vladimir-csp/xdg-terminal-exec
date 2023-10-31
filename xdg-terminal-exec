@@ -103,7 +103,7 @@ contains() {
 # Mask IFS withing function to allow temporary changes
 alias contains='IFS= contains'
 
-# Find all desktop entry files from standardised paths, populate $ENTRY_PATHS and add fallback IDs
+# Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
 	# Directory hierarchy that is searched for desktop entry files
 	data_directories="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
@@ -131,50 +131,21 @@ find_entry_paths() {
 		for entry_path in $(find -L "$directory" -type f -name '[[:alnum:]-_.]*.desktop' | sort); do
 			debug "found desktop entry '$entry_path'"
 			# Create entry ID from path
-			entry_path=${entry_path#"$directory"}
-			entry_id=$(printf '%s' "$entry_path" | tr '/' '-')
+			entry_id=$(printf '%s' "${entry_path#"$directory"}" | tr '/' '-')
 			# Do not add duplicate IDs
 			if ! contains "$ENTRY_IDS" "$entry_id"; then
 				debug "adding fallback ID '$entry_id'"
 				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
 			fi
-			# Delimit end of the data directory path by adding an extra '/' character
-			# This is done so the ID can be recreated later
-			entry_path="$directory"/"$entry_path"
-			ENTRY_PATHS=${ENTRY_PATHS:+${ENTRY_PATHS}${N}}$entry_path
+			# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
+			# For simplicity, the last ID encountered is the one used
+			# shellcheck disable=SC2139
+			alias "$entry_id"="entry_path='$entry_path'"
 		done
 	done
 }
 # Mask IFS withing function to allow temporary changes
 alias find_entry_paths='IFS= find_entry_paths'
-
-# Find a matching file path for a given entry ID
-match_entry_path() {
-	entry_id="$1"
-	debug "matching path for entry id '$entry_id'"
-
-	# Loop through paths, any empty lines should be discarded by word splitting
-	IFS="$N"
-	for entry_path in $ENTRY_PATHS; do
-		debug "checking entry '$entry_path'"
-		# ID is path without '$data_dir/$DATA_PREFIX_DIR//'
-		found_entry_id="${entry_path#*//}"
-		# Remove '//' from desktop entry path
-		entry_path="${entry_path%//*}"/"$found_entry_id"
-		found_entry_id="$(printf '%s' "$found_entry_id" | tr '/' '-')"
-		debug "checking entry id '$found_entry_id'"
-		# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
-		# For simplicity, the first ID encountered is the one used
-		[ "$found_entry_id" != "$entry_id" ] && continue
-		debug "found entry path '$entry_path'"
-		printf '%s' "$entry_path"
-		return 0
-	done
-	debug 'no matching entry path found'
-	return 1
-}
-# Mask IFS withing function to allow temporary changes
-alias match_entry_path='IFS= match_entry_path'
 
 # Check validity of a given entry key - value pair
 # Modifies following global variables:
@@ -291,9 +262,11 @@ read_entry_path() {
 find_entry() {
 	IFS="$N"
 	for entry_id in $ENTRY_IDS; do
-		# Find matching entry
-		entry_path=$(match_entry_path "$entry_id")
-		# Validate entry
+		debug "matching path for entry ID '$entry_id'"
+		# Check if a matching path was found for ID
+		alias "$entry_id" > /dev/null 2>&1 || continue
+		# Evaluates the alias, it sets $entry_path
+		eval "$entry_id"
 		read_entry_path "$entry_path" || continue
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
@@ -308,17 +281,14 @@ find_entry() {
 # Mask IFS withing function to allow temporary changes
 alias find_entry='IFS= find_entry'
 
-# All desktop entry ids in descending order of preference
+# All desktop entry ids in descending order of preference, with duplicates removed
 ENTRY_IDS=''
 # Modifies $ENTRY_IDS
 read_config_paths
-# All desktop entry paths in descending order of preference
-ENTRY_PATHS=''
-# Modifies $ENTRY_PATHS and $ENTRY_IDS
+# Modifies $ENTRY_IDS and sets global aliases
 find_entry_paths
 
 debug "final entry ID list '$ENTRY_IDS'"
-debug "final entry path list '$ENTRY_PATHS'"
 
 find_entry || true
 
