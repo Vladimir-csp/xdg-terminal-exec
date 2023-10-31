@@ -18,8 +18,7 @@
 # Disable pathname expansion
 set -euf
 
-# Backup original IFS value
-# It is assumed that $OIFS contains the default IFS value
+# Store original IFS value, assumed to contain the default: <space><tab><newline>
 OIFS="$IFS"
 # Newline, utility variable used throughout the script
 N='
@@ -62,6 +61,8 @@ find_config_paths() {
 		printf '%s\n' "$directory"/"$config_file"
 	done
 }
+# Mask IFS withing function to allow temporary changes
+alias find_config_paths='IFS= find_config_paths'
 
 # Parse all config files and populate $ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
@@ -88,6 +89,8 @@ read_config_paths() {
 		done < "$config_path"
 	done
 }
+# Mask IFS withing function to allow temporary changes
+alias read_config_paths='IFS= read_config_paths'
 
 # Check if newline delimited list $1 contains string $2
 contains() {
@@ -97,6 +100,8 @@ contains() {
 	done
 	return 1
 }
+# Mask IFS withing function to allow temporary changes
+alias contains='IFS= contains'
 
 # Find all desktop entry files from standardised paths, populate $ENTRY_PATHS and add fallback IDs
 find_entry_paths() {
@@ -140,6 +145,8 @@ find_entry_paths() {
 		done
 	done
 }
+# Mask IFS withing function to allow temporary changes
+alias find_entry_paths='IFS= find_entry_paths'
 
 # Find a matching file path for a given entry ID
 match_entry_path() {
@@ -163,10 +170,11 @@ match_entry_path() {
 		printf '%s' "$entry_path"
 		return 0
 	done
-	IFS="$OIFS"
 	debug 'no matching entry path found'
 	return 1
 }
+# Mask IFS withing function to allow temporary changes
+alias match_entry_path='IFS= match_entry_path'
 
 # Check validity of a given entry key - value pair
 # Modifies following global variables:
@@ -189,11 +197,9 @@ check_entry_key() {
 				debug "entry categorised as a Terminal Emulator"
 				# Set global variable
 				TERMINAL=true
-				IFS="$OIFS"
 				return 0
 			fi
 		done
-		IFS="$OIFS"
 		# Default in this case is to fail
 		return 1
 		;;
@@ -203,12 +209,10 @@ check_entry_key() {
 		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
-				IFS="$OIFS"
 				debug "checking OnlyShowIn match '$desktop'='$target'"
 				[ "$desktop" = "$target" ] && return 0
 			done
 		done
-		IFS="$OIFS"
 		# Default in this case is to fail
 		return 1
 		;;
@@ -218,12 +222,10 @@ check_entry_key() {
 		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
-				IFS="$OIFS"
 				debug "checking NotShowIn match '$desktop'='$target'"
 				[ "$desktop" = "$target" ] && return 1
 			done
 		done
-		IFS="$OIFS"
 		# Default in this case is to succeed
 		return 0
 		;;
@@ -244,6 +246,7 @@ check_entry_key() {
 		# Set global variable
 		EXEC=$value
 		# Get first word from read Exec value
+		IFS="$OIFS"
 		eval "set -- $EXEC"
 		debug "checking Exec[0] executable '$1'"
 		command -v "$1" > /dev/null || return 1
@@ -251,13 +254,15 @@ check_entry_key() {
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
 }
+# Mask IFS withing function to allow temporary changes
+alias check_entry='IFS= check_entry'
 
 # Read entry from given path, only parse 'Desktop Entry' group
 read_entry_path() {
 	entry_path="$1"
 	debug "reading desktop entry '$entry_path'"
 	# Let `read` trim leading/trailing whitespace from the line
-	while read -r line; do
+	while IFS="$OIFS" read -r line; do
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
 		'[Desktop Entry]'*) ;;
@@ -300,6 +305,8 @@ find_entry() {
 	# No valid entry was found
 	return 1
 }
+# Mask IFS withing function to allow temporary changes
+alias find_entry='IFS= find_entry'
 
 # All desktop entry ids in descending order of preference
 ENTRY_IDS=''
