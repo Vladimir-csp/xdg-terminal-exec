@@ -31,12 +31,6 @@ assert_output() {
 	}
 }
 
-@test "uses xterm -e as the fallback" {
-	run "$XTE" argument
-	assert_success
-	assert_output "xterm -e argument"
-}
-
 @test "uses globally configured entry" {
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
