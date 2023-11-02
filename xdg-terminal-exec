@@ -129,20 +129,32 @@ find_entry_paths() {
 		IFS="$N"
 		# Print order of found files is unpredictable, sort them
 		for entry_path in $(find -L "$directory" -type f -name '[[:alnum:]-_.]*.desktop' | sort); do
-			debug "found desktop entry '$entry_path'"
-			# Create entry ID from path
-			entry_id=$(printf '%s' "${entry_path#"$directory"}" | tr '/' '-')
-			# Do not add duplicate IDs
-			if ! contains "$ENTRY_IDS" "$entry_id"; then
-				debug "adding fallback ID '$entry_id'"
-				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
-			fi
-			# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
-			# For simplicity, the last ID encountered is the one used
-			# shellcheck disable=SC2139
-			alias "$entry_id"="entry_path='$entry_path'"
+			entry_paths=${entry_paths:+${entry_paths}${N}}$entry_path
+			# Remove data directory path from ID
+			entry_ids=${entry_ids:+${entry_ids}${N}}${entry_path#"$directory"}
 		done
 	done
+	# Convert all file path fragments into IDs in one operation
+	entry_ids=$(printf '%s' "${entry_ids-}" | tr '/' '-')
+	# Loop through paths and IDs simultaneously
+	IFS="$N"
+	while read -r entry_path && read -r entry_id <&3; do
+		debug "found desktop entry '$entry_path'"
+		# Do not add duplicate IDs
+		if ! contains "$ENTRY_IDS" "$entry_id"; then
+			debug "adding fallback ID '$entry_id'"
+			ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
+		fi
+		# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
+		# For simplicity, the last ID encountered is the one used
+		# shellcheck disable=SC2139
+		alias "$entry_id"="entry_path='$entry_path'"
+	# Use '//' as delimiter, as it can't be found within valid paths nor IDs
+	done <<- // 3<<- //
+		${entry_paths-}
+	//
+		${entry_ids-}
+	//
 }
 # Mask IFS withing function to allow temporary changes
 alias find_entry_paths='IFS= find_entry_paths'
