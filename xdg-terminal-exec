@@ -289,7 +289,7 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done
-	echo "No valid terminal entry was found" >&2
+	echo "No valid terminal entry was found in ${data_subdirectory}" >&2
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
