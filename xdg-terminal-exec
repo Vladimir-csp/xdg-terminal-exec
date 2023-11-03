@@ -289,7 +289,7 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done
-	debug "no valid entry was found"
+	echo "No valid terminal entry was found" >&2
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
