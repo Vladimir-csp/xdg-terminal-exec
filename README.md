@@ -32,9 +32,10 @@ Default paths are resolved into:
 Where `$desktop` is a lowercased string derived from `$XDG_CURRENT_DESKTOP`.
 If `$XDG_CURRENT_DESKTOP` is set then it contains a colon-separated list of names for the current DE.
 
-Data source can be explicitly controlled by first encountered line `use_stock_applications|use_xdg_terminals` in configs.
-Default can be set by `XTE_STOCK_TERMINALS` environment var and currently is normally `false`,
-but most likely will change to `true` in the future.
+Data source directory can be controlled with the `XTE_STOCK_TERMINALS` environment variable or by special lines in read config files.
+The first read `use_stock_applications` or `use_xdg_terminals` line in configs is equivalent to setting `XTE_STOCK_TERMINALS` to true or false respectively.
+Setting the `XTE_STOCK_TERMINALS` variable takes priority over lines read from configs.
+The default value of `XTE_STOCK_TERMINALS` is currently `false`, but will most likely be changed to `true` in the future.
 
 ## Priority of selecting entry
 
