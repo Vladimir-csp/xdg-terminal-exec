@@ -284,10 +284,12 @@ find_entry() {
 		[ -z "${EXEC-}" ] && continue
 		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator
 		[ "${XTE_STOCK_TERMINALS-}" = 'true' ] && [ -z "${TERMINAL-}" ] && continue
+		# Set defaults
+		: "${EXECARG="-e"}"
 		# Entry is valid, stop
 		return 0
 	done
-	# No valid entry was found
+	echo "No valid terminal entry was found in ${data_subdirectory}" >&2
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
@@ -302,11 +304,7 @@ find_entry_paths
 
 debug "final entry ID list '$ENTRY_IDS'"
 
-find_entry || true
-
-# Set defaults
-: "${EXEC="xterm"}"
-: "${EXECARG="-e"}"
+find_entry || exit 1
 
 # Store original argument list, before it's modified
 ORIG_ARGV="$*"
