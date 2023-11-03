@@ -32,8 +32,8 @@ Default paths are resolved into:
 Where `$desktop` is a lowercased string derived from `$XDG_CURRENT_DESKTOP`.
 If `$XDG_CURRENT_DESKTOP` is set then it contains a colon-separated list of names for the current DE.
 
-Data source directory can be controlled with the `XTE_STOCK_TERMINALS` environment variable or by special lines in read config files.
-The first read `use_stock_applications` or `use_xdg_terminals` line in configs is equivalent to setting `XTE_STOCK_TERMINALS` to true or false respectively.
+Data source directory can be controlled with the `XTE_STOCK_TERMINALS` environment variable or by special lines in config files.
+The first encountered `use_stock_applications` or `use_xdg_terminals` line in configs is equivalent to setting `XTE_STOCK_TERMINALS` to true or false respectively.
 Setting the `XTE_STOCK_TERMINALS` variable takes priority over lines read from configs.
 The default value of `XTE_STOCK_TERMINALS` is currently `false`, but will most likely be changed to `true` in the future.
 
@@ -70,3 +70,7 @@ xdg-terminal-exec nano "some file with spaces"\ and\ unquoted\ spaces second\ fi
 ```
 launches nano editing two files named `some file with spaces and unquoted spaces` and `second file`.
 And IMHO that is the golden standard, any terminal that fails to do so should be bugreported.
+
+Some examples of compliant terminals: xterm, alacritty, kitty, foot, qterminal
+
+Terminals that use `-e` but mangle arguments: sakura
