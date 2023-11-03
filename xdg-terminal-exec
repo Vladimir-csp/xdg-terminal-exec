@@ -167,6 +167,8 @@ alias find_entry_paths='IFS= find_entry_paths'
 check_entry_key() {
 	key="$1"
 	value="$2"
+	action="$3"
+	read_exec="$4"
 
 	# Order of checks is important
 	case $key in
@@ -186,6 +188,21 @@ check_entry_key() {
 		# Default in this case is to fail
 		return 1
 		;;
+	'Actions'*=*)
+		# `It is not valid to have an action group for an action identifier not mentioned in the Actions key. Such an action group must be ignored by implementors.`
+		# ignore if no action requested
+		[ -z "$action" ] && return 0
+		debug "read Actions '$value'"
+		IFS=';'
+		for check_action in $value; do
+			if [ "$check_action" = "$action" ]; then
+				debug "requested action '$action' is listed in Actions"
+				return 0
+			fi
+		done
+		# Default in this case is to fail
+		return 1
+	;;
 	'OnlyShowIn'*=*)
 		debug "read OnlyShowIn '$value'"
 		IFS=';'
@@ -226,6 +243,10 @@ check_entry_key() {
 		[ "$value" = 'true' ] && return 1
 		;;
 	'Exec'*=*)
+		if [ "$read_exec" = "false" ]; then
+			debug "ignored exec from wrong section"
+			return 0
+		fi
 		# Set global variable
 		EXEC=$value
 		# Get first word from read Exec value
@@ -243,12 +264,16 @@ alias check_entry='IFS= check_entry'
 # Read entry from given path, only parse 'Desktop Entry' group
 read_entry_path() {
 	entry_path="$1"
-	debug "reading desktop entry '$entry_path'"
+	entry_action="$2"
+	read_exec=false
+
+	debug "reading desktop entry '$entry_path' action '$entry_action'"
 	# Let `read` trim leading/trailing whitespace from the line
 	while IFS="$OIFS" read -r line; do
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
-		'[Desktop Entry]'*) ;;
+		# if entry_action is not requested, allow reading Exec
+		'[Desktop Entry]'*) [ -z "$entry_action" ] && read_exec=true ;;
 		# A `Key=Value` pair
 		[A-Za-z0-9-]*)
 			# Split value from pair
@@ -256,15 +281,17 @@ read_entry_path() {
 			# Remove all but leading spaces, and trim that from the value
 			value=${value#"${value%%[! ]*}"}
 			# Check the key
-			check_entry_key "$line" "$value" && continue
+			check_entry_key "$line" "$value" "$entry_action" "$read_exec" && continue
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
 			unset TERMINAL
 			return 1
 			;;
-		# Start of the next group header, stop
-		'['*) break ;;
+		# found specified action, allow reading Exec
+		"[Desktop Action ${entry_action}]"*) read_exec=true ;;
+		# Start of the next group header, stop if already read exec
+		'['*) [ "$read_exec" = "true" ] && break ;;
 		esac
 		# By default empty lines and comments get ignored
 	done < "$entry_path"
@@ -274,12 +301,19 @@ read_entry_path() {
 find_entry() {
 	IFS="$N"
 	for entry_id in $ENTRY_IDS; do
+		case "$entry_id" in
+		*:*)
+			entry_action=${entry_id#*:}
+			entry_id=${entry_id%:*}
+		;;
+		*) entry_action='' ;;
+		esac
 		debug "matching path for entry ID '$entry_id'"
 		# Check if a matching path was found for ID
 		alias "$entry_id" > /dev/null 2>&1 || continue
 		# Evaluates the alias, it sets $entry_path
 		eval "$entry_id"
-		read_entry_path "$entry_path" || continue
+		read_entry_path "$entry_path" "${entry_action}" || continue
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
 		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator

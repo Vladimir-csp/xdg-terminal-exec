@@ -9,7 +9,7 @@ Either stock entries can be used (marked by `TerminalEmulator` category),
 or separate entries placed in directories named `xdg-terminals` provided via XDG_DATA hierarchy. Selection mechanism is described below.
 
 Preferred terminals are configured in config files named `xdg-terminals.list` provided via XDG_CONFIG hierarchy.
-Format for config file is a a simple newline-separated list of desktop entries. #Comments and dangling whitespaces are trimmed.
+Format for config file is a a simple newline-separated list of desktop entry IDs with optional action ID delimited by ':'. `#Comments` and dangling whitespaces are trimmed.
 
 Default paths are resolved into:
 
@@ -49,6 +49,13 @@ The default value of `XTE_STOCK_TERMINALS` is currently `false`, but will most l
 
 Stock desktop entry for terminal emulator may be used. Command execution argument defaults to `-e`.
 Key `X-ExecArg=` can be used to override it (or omit by explicitly setting empty) if terminal emulator uses a different argument.
+
+Whether launched terminal process waits for command to finish or exits immediately (i.e. after sending IPC request to a master process)
+is not defined by the this spec. Selected terminal emulator with requested arguments is executed as is.
+Some IPC-using terminals provide separate entries or [actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html) for launching separate processes without IPC.
+
+Specific action can be selected by appending colon-delimited action ID to entry ID in `xdg-terminals.list` config
+(`entry-id.desktop:action-id`).
 
 ## Syntax
 
