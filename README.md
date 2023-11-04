@@ -10,7 +10,7 @@ or separate entries placed in directories named `xdg-terminals` provided via XDG
 
 Preferred terminals are configured in config files named `xdg-terminals.list` provided via XDG_CONFIG hierarchy.
 Format for config file is a a simple newline-separated list of desktop [entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s02.html#desktop-file-id)
-with optional [action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html) delimited by ':'.
+with optional [action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html) delimited by `:`.
 `#Comments` and dangling whitespaces are trimmed.
 
 Default paths are resolved into:
