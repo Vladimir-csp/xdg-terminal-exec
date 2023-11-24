@@ -139,6 +139,10 @@ find_entry_paths() {
 	# Loop through paths and IDs simultaneously
 	IFS="$N"
 	while read -r entry_path && read -r entry_id <&3; do
+		if [ -z "$entry_path" ] || [ -z "$entry_id" ]; then
+			debug "empty data: entry_path: \"$entry_path\", entry_id: \"$entry_id\""
+			continue
+		fi
 		debug "found desktop entry '$entry_path'"
 		# Do not add duplicate IDs
 		if ! contains "$ENTRY_IDS" "$entry_id"; then
