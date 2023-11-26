@@ -143,10 +143,15 @@ find_entry_paths() {
 			debug "empty data: entry_path: '$entry_path', entry_id: '$entry_id'"
 			continue
 		fi
+
 		# since we are moving up the XDG heirarchy, the first encoutered path for entry ID is used
 		if alias "$entry_id" > /dev/null 2>&1; then
 			debug "skipped '$entry_path' as '$entry_id' (overridden earlier)"
 		else
+			# alias can fail on weird (invalid) entry ID
+			# Could add a proper validator above, but might be too taxing doing it on all entries,
+			# so this is just a first line of defence, more sensitive in bash than dash btw.
+			# A proper validator is applied later on entry parsing.
 			# shellcheck disable=SC2139
 			if alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1; then
 				debug "registered '$entry_path' as entry '$entry_id'"
@@ -307,6 +312,49 @@ read_entry_path() {
 	done < "$entry_path"
 }
 
+validate_entry_action_id() {
+	# validates entry and action ID strings
+	check_entry_id=${1}
+	check_action_id=${2}
+	check=true
+
+	case "$check_entry_id" in
+	*.desktop)
+		check2_entry_id=${check_entry_id%.desktop}
+		while [ -n "$check2_entry_id" ]; do
+			# cut [[:alnum:]-_.] one by one, fail if cut did not happen
+			cut_check2_entry_id=${check2_entry_id%[[:alnum:]-_.]}
+			if [ "$check2_entry_id" != "$cut_check2_entry_id" ]; then
+				check2_entry_id="$cut_check2_entry_id"
+			else
+				echo "Invalid Entry ID '$check_entry_id'" >&2
+				check=false
+				break
+			fi
+		done
+	;;
+	*)
+		echo "Invalid Entry ID '$check_entry_id'" >&2
+		check=false
+	;;
+	esac
+
+	check2_action_id="$check_action_id"
+	while [ -n "$check2_action_id" ]; do
+		# cut [A-Za-z0-9-] one by one, fail if cut did not happen
+		cut_check2_action_id=${check2_action_id%[A-Za-z0-9-]}
+		if [ "$check2_action_id" != "$cut_check2_action_id" ]; then
+			check2_action_id="$cut_check2_action_id"
+		else
+			echo "Invalid action ID '$check_action_id'" >&2
+			check=false
+			break
+		fi
+	done
+
+	case "$check" in true) return 0 ;; false) return 1 ;; esac
+}
+
 # Loop through IDs and try to find a valid entry
 find_entry() {
 	IFS="$N"
@@ -318,6 +366,8 @@ find_entry() {
 		;;
 		*) entry_action='' ;;
 		esac
+		validate_entry_action_id "$entry_id" "$entry_action" || continue
+
 		debug "matching path for entry ID '$entry_id'"
 		# Check if a matching path was found for ID
 		alias "$entry_id" > /dev/null 2>&1 || continue
