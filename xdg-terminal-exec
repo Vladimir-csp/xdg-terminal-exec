@@ -140,19 +140,25 @@ find_entry_paths() {
 	IFS="$N"
 	while read -r entry_path && read -r entry_id <&3; do
 		if [ -z "$entry_path" ] || [ -z "$entry_id" ]; then
-			debug "empty data: entry_path: \"$entry_path\", entry_id: \"$entry_id\""
+			debug "empty data: entry_path: '$entry_path', entry_id: '$entry_id'"
 			continue
 		fi
-		debug "found desktop entry '$entry_path'"
-		# Do not add duplicate IDs
-		if ! contains "$ENTRY_IDS" "$entry_id"; then
-			debug "adding fallback ID '$entry_id'"
-			ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
+		# since we are moving up the XDG heirarchy, the first encoutered path for entry ID is used
+		if alias "$entry_id" > /dev/null 2>&1; then
+			debug "skipped '$entry_path' as '$entry_id' (overridden earlier)"
+		else
+			# shellcheck disable=SC2139
+			if alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1; then
+				debug "registered '$entry_path' as entry '$entry_id'"
+				# add as fallback ID if was not already listed
+				if ! contains "$ENTRY_IDS" "$entry_id"; then
+					ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id
+					debug "added fallback ID '$entry_id'"
+				fi
+			else
+				echo "failed to register '$entry_path' as entry '$entry_id'" >&2
+			fi
 		fi
-		# `If [entries with duplicate IDs] exist, it is undefined which is selected.`
-		# For simplicity, the last ID encountered is the one used
-		# shellcheck disable=SC2139
-		alias "$entry_id"="entry_path='$entry_path'"
 	# Use '//' as delimiter, as it can't be found within valid paths nor IDs
 	done <<- // 3<<- //
 		${entry_paths-}
@@ -340,7 +346,9 @@ read_config_paths
 # Modifies $ENTRY_IDS and sets global aliases
 find_entry_paths
 
-debug "final entry ID list '$ENTRY_IDS'"
+debug "final entry ID list:
+$ENTRY_IDS
+end of final entry ID list"
 
 find_entry || exit 1
 
