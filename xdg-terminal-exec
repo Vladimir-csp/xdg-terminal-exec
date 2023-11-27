@@ -161,7 +161,7 @@ find_entry_paths() {
 					debug "added fallback ID '$entry_id'"
 				fi
 			else
-				echo "failed to register '$entry_path' as entry '$entry_id'" >&2
+				echo "skipped '$entry_path' due to unsupported filename" >&2
 			fi
 		fi
 	# Use '//' as delimiter, as it can't be found within valid paths nor IDs
@@ -204,7 +204,8 @@ check_entry_key() {
 		return 1
 		;;
 	'Actions'*=*)
-		# `It is not valid to have an action group for an action identifier not mentioned in the Actions key. Such an action group must be ignored by implementors.`
+		# `It is not valid to have an action group for an action identifier not mentioned in the Actions key.
+		# Such an action group must be ignored by implementors.`
 		# ignore if no action requested
 		[ -z "$action" ] && return 0
 		debug "read Actions '$value'"
@@ -276,7 +277,7 @@ check_entry_key() {
 # Mask IFS withing function to allow temporary changes
 alias check_entry='IFS= check_entry'
 
-# Read entry from given path, only parse 'Desktop Entry' group
+# Read entry from given path
 read_entry_path() {
 	entry_path="$1"
 	entry_action="$2"
@@ -287,7 +288,7 @@ read_entry_path() {
 	while IFS="$OIFS" read -r line; do
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
-		# if entry_action is not requested, allow reading Exec
+		# if entry_action is not requested, allow reading Exec right away from the main group
 		'[Desktop Entry]'*) [ -z "$entry_action" ] && read_exec=true ;;
 		# A `Key=Value` pair
 		[A-Za-z0-9-]*)
@@ -303,7 +304,7 @@ read_entry_path() {
 			unset TERMINAL
 			return 1
 			;;
-		# found specified action, allow reading Exec
+		# found requested action, allow reading Exec
 		"[Desktop Action ${entry_action}]"*) read_exec=true ;;
 		# Start of the next group header, stop if already read exec
 		'['*) [ "$read_exec" = "true" ] && break ;;
@@ -327,14 +328,14 @@ validate_entry_action_id() {
 			if [ "$check2_entry_id" != "$cut_check2_entry_id" ]; then
 				check2_entry_id="$cut_check2_entry_id"
 			else
-				echo "Invalid Entry ID '$check_entry_id'" >&2
+				echo "Skipping unsupported Entry ID '$check_entry_id'" >&2
 				check=false
 				break
 			fi
 		done
 	;;
 	*)
-		echo "Invalid Entry ID '$check_entry_id'" >&2
+		echo "Skipping unsupported Entry ID '$check_entry_id'" >&2
 		check=false
 	;;
 	esac
