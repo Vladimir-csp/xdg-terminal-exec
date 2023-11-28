@@ -43,9 +43,15 @@ The default value of `XTE_STOCK_TERMINALS` is currently `false`, but will most l
 
   - Read configs throughout XDG_CONFIG hierarchy.
     - in each tier `$desktop-xdg-terminals.list` gets first priority, `xdg-terminals.list` gets second priority
-    - each entry found in configs is checked for applicability (same rules as in Desktop Entry Spec) and is skipped on failure.
-  - If no valid entries were found among those marked in configs, every entry found in XDG_DATA hierarchy is checked in a row. First applicable will be used.
-  - If all of the above fails, error is returned.
+    - each entry found in configs is checked for applicability:
+      - same rules as in Desktop Entry Spec except *ShowIn conditions
+      - entry is discarded if it does not pass the tests
+      - the first applicable entry is used
+  - If no applicable entry is found, every entry in XDG_DATA hierarchy is checked in a row:
+    - presense of `TerminalEmulator` category if using stock 'applications' data subdirs
+    - same rules as in Desktop Entry Spec, now including *ShowIn conditions
+    - the first applicable entry is used
+  - If no applicable entry is found, error is returned.
 
 ## Desktop entry for terminal
 
