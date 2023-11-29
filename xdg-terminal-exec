@@ -221,7 +221,7 @@ check_entry_key() {
 		debug "checking for '$action' in Actions '$value'"
 		IFS=';'
 		for check_action in $value; do
-			[ "$check_action" = "$action"] && return 0
+			[ "$check_action" = "$action" ] && return 0
 		done
 		# Default in this case is to fail
 		return 1
