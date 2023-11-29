@@ -3,3 +3,4 @@ Name=Not Terminal
 Type=Application
 Exec=echo not terminal
 NotShowIn=not;
+Categories=TerminalEmulator;

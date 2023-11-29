@@ -2,3 +2,4 @@
 Name=Specific Terminal
 Type=Application
 Exec=echo specific terminal
+Categories=TerminalEmulator;

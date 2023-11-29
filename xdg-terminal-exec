@@ -122,7 +122,7 @@ find_entry_paths() {
 	# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
 	# 'applications', the standardised location for application desktop entry files
 	# When searching in 'applications', entries will be filtered based on their Category key
-	if check_bool "${XTE_STOCK_TERMINALS-false}"; then
+	if check_bool "${XTE_STOCK_TERMINALS-true}"; then
 		data_subdirectory='applications'
 	else
 		data_subdirectory='xdg-terminals'
@@ -189,7 +189,7 @@ alias find_entry_paths='IFS= find_entry_paths'
 # Modifies following global variables:
 # EXEC : Program to execute, possibly with arguments. See spec for details.
 # EXECARG : Execution argument for the terminal emulator.
-# TERMINAL : Set if application has been categorised as a terminal emulator
+# TERMINAL : Set if application has been categorized as a terminal emulator
 check_entry_key() {
 	key="$1"
 	value="$2"
@@ -201,7 +201,7 @@ check_entry_key() {
 	case $key in
 	'Categories'*=*)
 		# Enforce only if reading from 'applications' subdirectory
-		! check_bool "${XTE_STOCK_TERMINALS-false}" && return 0
+		! check_bool "${XTE_STOCK_TERMINALS-true}" && return 0
 		debug "checking for 'TerminalEmulator' in Categories '$value'"
 		IFS=';'
 		for category in $value; do
@@ -408,8 +408,8 @@ find_entry() {
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
-		# If reading from 'applications' subdirectory, ensure entry is a Terminal Emulator
-		[ "${XTE_STOCK_TERMINALS-}" = 'true' ] && [ -z "${TERMINAL-}" ] && continue
+		# ensure entry is a Terminal Emulator when using stock applications
+		check_bool "${XTE_STOCK_TERMINALS-true}" && [ -z "${TERMINAL-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop

@@ -2,3 +2,4 @@
 Name=Preferred Terminal
 Type=Application
 Exec=echo preferred terminal
+Categories=TerminalEmulator;

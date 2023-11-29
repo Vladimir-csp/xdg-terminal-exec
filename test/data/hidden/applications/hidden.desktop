@@ -3,3 +3,4 @@ Name=Hidden Entry
 Type=Application
 Exec=echo hidden entry
 Hidden=true
+Categories=TerminalEmulator;

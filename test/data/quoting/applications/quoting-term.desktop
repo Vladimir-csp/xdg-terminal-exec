@@ -2,3 +2,4 @@
 Name=Default Terminal
 Type=Application
 Exec=printf '|||%s|||\n' quoting\ terminal "with 'complex' arguments" 'and \"back\\slashes\"'
+Categories=TerminalEmulator;

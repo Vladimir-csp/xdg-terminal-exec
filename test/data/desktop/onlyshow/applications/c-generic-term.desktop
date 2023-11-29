@@ -1,0 +1,5 @@
+[Desktop Entry]
+Name=Generic Terminal
+Type=Application
+Exec=echo generic terminal
+Categories=TerminalEmulator;

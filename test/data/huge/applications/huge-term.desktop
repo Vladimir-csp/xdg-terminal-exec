@@ -415,3 +415,4 @@ Name[zh_HK]=偏好設定
 Name[zh_TW]=偏好設定
 Name=Preferences
 Exec=echo huge terminal --preferences
+Categories=TerminalEmulator;

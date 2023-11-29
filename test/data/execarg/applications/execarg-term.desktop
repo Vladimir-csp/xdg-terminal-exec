@@ -3,3 +3,4 @@ Name=ExecArg Terminal
 Type=Application
 Exec=echo execarg terminal
 X-ExecArg=--
+Categories=TerminalEmulator;

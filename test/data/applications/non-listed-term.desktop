@@ -3,3 +3,4 @@ Type=Application
 TryExec=testterm
 Exec=testterm non-listed-term
 Name=Non-listed term
+Categories=TerminalEmulator;

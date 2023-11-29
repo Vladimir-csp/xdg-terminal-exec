@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Only Terminal
+Type=Application
+Exec=echo only terminal
+OnlyShowIn=only;
+Categories=TerminalEmulator;

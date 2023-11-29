@@ -159,9 +159,9 @@ assert_output() {
 }
 
 @test "considers entry when its OnlyShowIn matches" {
-	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
-	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
-	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/nothing"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/onlyshow"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=only
 	run "$XTE"
@@ -170,9 +170,9 @@ assert_output() {
 }
 
 @test "considers entry when its NotShowIn does not match" {
-	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
-	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
-	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/nothing"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/notshow"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=other
 	run "$XTE"
@@ -181,8 +181,8 @@ assert_output() {
 }
 
 @test "ignores entry when its NotShowIn matches or its OnlyShowIn does not match" {
-	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/show"
-	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/nothing"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/nothing"
 	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/show"
 	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
 	export XDG_CURRENT_DESKTOP=not
