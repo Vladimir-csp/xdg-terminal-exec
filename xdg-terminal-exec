@@ -41,6 +41,49 @@ else
 	debug() { :; }
 fi
 
+make_paths() {
+	# generates iterators for all possible paths
+	IFS=':'
+
+	# config files
+	for DIR in ${XDG_CONFIG_HOME:-"${HOME}/.config"}${IFS}${XDG_CONFIG_DIRS:-/etc/xdg}; do
+		for DESKTOP in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
+			CONFIGS=${CONFIGS-}${CONFIGS:+:}${DIR%/}/${DESKTOP}-xdg-terminals.list
+		done
+		CONFIGS=${CONFIGS-}${CONFIGS:+:}${DIR%/}/xdg-terminals.list
+	done
+
+	# data dirs
+	for DIR in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+		STOCK_DATA_DIRS=${STOCK_DATA_DIRS-}${STOCK_DATA_DIRS:+:}${DIR%/}/applications
+		XT_DATA_DIRS=${XT_DATA_DIRS-}${XT_DATA_DIRS:+:}${DIR%/}/xdg-terminals
+	done
+
+	# cache
+	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
+	CACHE_PATH="${XDG_CACHE_HOME}/xdg-terminal-exec"
+}
+# Mask IFS withing function to allow temporary changes
+alias make_paths='IFS= make_paths'
+
+gen_cache() {
+	# make md5 of ls output for config and data paths
+	cache_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
+
+	read -r CACHE drop <<- EOC
+		$(
+			IFS=:
+			LANG=C ls -LRl ${cache_paths} 2>/dev/null | md5sum
+		)
+	EOC
+}
+
+save_cache() {
+	# Saves $CACHE and entry path to cache file
+	[ ! -d "${XDG_CACHE_HOME}" ] && mkdir "${XDG_CACHE_HOME}"
+	echo "${CACHE}" > "${XDG_CACHE_HOME}/xdg-terminal-exec"
+}
+
 # Find and print all config file paths
 find_config_paths() {
 	# Directories searched for config files, in decending order of preference
@@ -49,13 +92,12 @@ find_config_paths() {
 	config_file=xdg-terminals.list
 	# Generate list of possible config files for current Dekstop Environment
 	# TODO: Should this be case insensitive? Desktop entry checks that also use $XDG_CURRENT_DESKTOP are not
-	lowercase_desktops="$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')"
-	debug "lowercase desktops are: '$lowercase_desktops'"
+	debug "lowercase desktops are: '$LOWERCASE_XDG_CURRENT_DESKTOP'"
 	# Loop through paths
 	# TODO: Replace this by a find call?
 	IFS=':'
 	for directory in $config_directories; do
-		for desktop in $lowercase_desktops; do
+		for desktop in $LOWERCASE_XDG_CURRENT_DESKTOP; do
 			printf '%s\n' "$directory"/"$desktop"-"$config_file"
 		done
 		printf '%s\n' "$directory"/"$config_file"
@@ -114,6 +156,36 @@ contains() {
 # Mask IFS withing function to allow temporary changes
 alias contains='IFS= contains'
 
+replace() {
+	# takes $1, finds $2, replaces with $3
+	# does it in large chunks
+
+	# var to be modified
+	string=${1}
+	# right part of string
+	r_string=${1}
+	# left part of string
+	l_string=''
+	# previous right part of string
+	prev_r_string=''
+	while true; do
+		# save previous r_string
+		prev_r_string=${r_string}
+		# cut the right part with search string from the left
+		r_string=${r_string#*"${2}"}
+		# cut the left part with search string and rigth part from the right
+		l_string=${string%"${2}${r_string}"}
+		case "$r_string" in
+		# if the right part was not unmodified, there is nothing to replace
+		"$prev_r_string") break ;;
+		# if the right part was is modified, update string with:
+		# the left part, replace string, the right part
+		*) string=${l_string}${3}${r_string} ;;
+		esac
+	done
+	echo "$string"
+}
+
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
 	# Directory hierarchy that is searched for desktop entry files
@@ -146,7 +218,7 @@ find_entry_paths() {
 		done
 	done
 	# Convert all file path fragments into IDs in one operation
-	entry_ids=$(printf '%s' "${entry_ids-}" | tr '/' '-')
+	entry_ids=$(replace "${entry_ids-}" '/' '-')
 	# Loop through paths and IDs simultaneously
 	IFS="$N"
 	while read -r entry_path && read -r entry_id <&3; do
@@ -421,10 +493,18 @@ find_entry() {
 # Mask IFS withing function to allow temporary changes
 alias find_entry='IFS= find_entry'
 
-# All desktop entry ids in descending order of preference from *xdg-terminals.list configs, with duplicates removed
+## globals
+LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
+# path iterators
+make_paths
+
+# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
+# with duplicates removed
 ENTRY_IDS=''
-# All desktop entry ids found in data dirs in descending order of preference, with duplicates (including $ENTRY_IDS) removed
+# All desktop entry ids found in data dirs in descending order of preference,
+# with duplicates (including those in $ENTRY_IDS) removed
 FALLBACK_ENTRY_IDS=''
+
 # Modifies $ENTRY_IDS
 read_config_paths
 # Modifies $ENTRY_IDS and sets global aliases
