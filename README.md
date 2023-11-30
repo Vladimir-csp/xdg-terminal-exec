@@ -40,8 +40,12 @@ Where `${desktop}` is a lowercased string that can be matched (case-insensitive)
 Selection of data subdirectory is determined by (ordered by decreasing priority):
 
 - environment variable `XTE_STOCK_TERMINALS` (`true` or `false`)
-- the first encountered directive `use_stock_applications` or `use_xdg_terminals` in `*xdg-terminals.list` configs.
+- the first encountered directive `/use_stock_applications` or `/use_xdg_terminals` in `*xdg-terminals.list` configs.
 - use stock entries by default.
+
+Other directives understood by a particular implementations may be present in config files and should be discarded
+by implementations that do not understand them. It is recommended to start them with a symbol that is not valid
+for entry ID, i.e. `/`.
 
 ## Priority of selecting an entry
 

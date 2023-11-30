@@ -80,12 +80,12 @@ read_config_paths() {
 			case $line in
 			# Whether to search for entries in 'xdg-terminals' or 'applications'
 			# Can be overriden by $XTE_STOCK_TERMINALS
-			use_stock_applications)
-				debug "found use_stock_applications directive${XTE_STOCK_TERMINALS+ (ignored)}"
+			/use_stock_applications | use_stock_applications)
+				debug "found '$line' directive${XTE_STOCK_TERMINALS+ (ignored)}"
 				XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-true}
 				;;
-			use_xdg_terminals)
-				debug "found use_xdg_terminals directive${XTE_STOCK_TERMINALS+ (ignored)}"
+			/use_xdg_terminals | use_xdg_terminals)
+				debug "found '$line' directive${XTE_STOCK_TERMINALS+ (ignored)}"
 				XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-false}
 				;;
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
