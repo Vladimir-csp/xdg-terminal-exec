@@ -29,7 +29,7 @@ check_bool() {
 	true | True | TRUE | yes | Yes | YES | 1) return 0 ;;
 	false | False | FALSE | no | No | NO | 0) return 1 ;;
 	*)
-		echo "Assuming \"$1\" means no" >&2
+		echo "Assuming '$1' means no" >&2
 		return 1
 		;;
 	esac
@@ -46,73 +46,122 @@ make_paths() {
 	IFS=':'
 
 	# config files
-	for DIR in ${XDG_CONFIG_HOME:-"${HOME}/.config"}${IFS}${XDG_CONFIG_DIRS:-/etc/xdg}; do
-		for DESKTOP in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
-			CONFIGS=${CONFIGS-}${CONFIGS:+:}${DIR%/}/${DESKTOP}-xdg-terminals.list
+	for dir in ${XDG_CONFIG_HOME:-"${HOME}/.config"}${IFS}${XDG_CONFIG_DIRS:-/etc/xdg}; do
+		# Normalise base path and append the data subdirectory with a trailing '/'
+		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
+			CONFIGS=${CONFIGS-}${CONFIGS:+:}${dir%/}/${desktop}-xdg-terminals.list
 		done
-		CONFIGS=${CONFIGS-}${CONFIGS:+:}${DIR%/}/xdg-terminals.list
+		CONFIGS=${CONFIGS-}${CONFIGS:+:}${dir%/}/xdg-terminals.list
 	done
 
 	# data dirs
-	for DIR in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
-		STOCK_DATA_DIRS=${STOCK_DATA_DIRS-}${STOCK_DATA_DIRS:+:}${DIR%/}/applications
-		XT_DATA_DIRS=${XT_DATA_DIRS-}${XT_DATA_DIRS:+:}${DIR%/}/xdg-terminals
+	for dir in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+		# Normalise base path and append the data subdirectory with a trailing '/'
+		STOCK_DATA_DIRS=${STOCK_DATA_DIRS-}${STOCK_DATA_DIRS:+:}${dir%/}/applications/
+		XT_DATA_DIRS=${XT_DATA_DIRS-}${XT_DATA_DIRS:+:}${dir%/}/xdg-terminals/
 	done
 
 	# cache
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
-	CACHE_PATH="${XDG_CACHE_HOME}/xdg-terminal-exec"
+	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
+
+	debug "paths: ${N}CONFIGS ${CONFIGS}${N}STOCK_DATA_DIRS ${STOCK_DATA_DIRS}${N}XT_DATA_DIRS ${XT_DATA_DIRS}"
 }
 # Mask IFS withing function to allow temporary changes
 alias make_paths='IFS= make_paths'
 
-gen_cache() {
-	# make md5 of ls output for config and data paths
-	cache_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
-
-	read -r CACHE drop <<- EOC
+gen_hash() {
+	# return md5 of ls output for config and data paths
+	# shellcheck disable=SC2034
+	read -r hash drop <<- EOH
 		$(
+			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
 			IFS=:
-			LANG=C ls -LRl ${cache_paths} 2>/dev/null | md5sum
+			# shellcheck disable=SC2012,SC2086
+			LANG=C ls -LRl ${hash_paths} 2> /dev/null | md5sum 2> /dev/null
 		)
-	EOC
+	EOH
+	case "$hash" in
+	[0-9a-f]*[0-9a-f])
+		echo "$hash"
+		return 0
+		;;
+	*) return 1 ;;
+	esac
+}
+
+read_cache() {
+	# reads $CACHED_HASH, $CACHED_EXEC, $CAHCED_EXECARG from cache file, otherwise returns 1
+	if [ -f "${CACHE_FILE}" ]; then
+		IFS=${N}
+		line_num=1
+		# special case
+		CACHED_EXECARG=__UNDEFINED__
+		while read -r line; do
+			case "$line_num" in
+			1) CACHED_HASH=$line ;;
+			2) CACHED_EXEC=$line ;;
+			3) CACHED_EXECARG=$line ;;
+			*) break ;;
+			esac
+			line_num=$((line_num + 1))
+		done < "${CACHE_FILE}"
+		if [ -z "$CACHED_HASH" ] || [ -z "$CACHED_EXEC" ] || [ "$CACHED_EXECARG" = "__UNDEFINED__" ]; then
+			debug "invlaid cache data"
+			return 1
+		else
+			debug "got cache: ${N}${CACHED_HASH}${N}${CACHED_EXEC}${N}${CACHED_EXECARG}"
+			return 0
+		fi
+	else
+		debug "no cache data"
+		return 1
+	fi
+}
+# Mask IFS withing function to allow temporary changes
+alias read_cache='IFS= read_cache'
+
+try_cache() {
+	# checks if cache is valid and applies it, otherwise returns 1
+	read_cache || return 1
+	HASH=$(gen_hash) || return 1
+	# ${CACHED_EXEC} ${CACHED_EXECARG} are checked for non-emptiness in read_cache
+	if [ "$HASH" = "$CACHED_HASH" ]; then
+		EXEC=${CACHED_EXEC}
+		EXECARG=${CACHED_EXECARG}
+		return 0
+	else
+		return 1
+	fi
 }
 
 save_cache() {
-	# Saves $CACHE and entry path to cache file
-	[ ! -d "${XDG_CACHE_HOME}" ] && mkdir "${XDG_CACHE_HOME}"
-	echo "${CACHE}" > "${XDG_CACHE_HOME}/xdg-terminal-exec"
+	# saves $HASH, $EXEC, $EXECARG to cache file or removes it if CACHE_ENABLE is false
+	if check_bool "$CACHE_ENABLED"; then
+		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
+		if [ -z "${HASH}" ]; then
+			HASH=$(gen_hash) || {
+				echo "could not hash listing, removing '${CACHE_FILE}'" >&2
+				rm -f "${CACHE_FILE}"
+				return 0
+			}
+		fi
+		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" > "${CACHE_FILE}"
+		debug "saved cache: ${N}${HASH}${N}${EXEC}${N}${EXECARG}"
+	else
+		debug "cache is disabled, removing '${CACHE_FILE}'"
+		rm -f "${CACHE_FILE}"
+		return 0
+	fi
 }
-
-# Find and print all config file paths
-find_config_paths() {
-	# Directories searched for config files, in decending order of preference
-	config_directories="${XDG_CONFIG_HOME:-$HOME/.config}:${XDG_CONFIG_DIRS:-/etc/xdg}"
-	# Config filename to parse
-	config_file=xdg-terminals.list
-	# Generate list of possible config files for current Dekstop Environment
-	# TODO: Should this be case insensitive? Desktop entry checks that also use $XDG_CURRENT_DESKTOP are not
-	debug "lowercase desktops are: '$LOWERCASE_XDG_CURRENT_DESKTOP'"
-	# Loop through paths
-	# TODO: Replace this by a find call?
-	IFS=':'
-	for directory in $config_directories; do
-		for desktop in $LOWERCASE_XDG_CURRENT_DESKTOP; do
-			printf '%s\n' "$directory"/"$desktop"-"$config_file"
-		done
-		printf '%s\n' "$directory"/"$config_file"
-	done
-}
-# Mask IFS withing function to allow temporary changes
-alias find_config_paths='IFS= find_config_paths'
 
 # Parse all config files and populate $ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
 	# This allows for easier deduplication, when adding fallback IDs later on
-	IFS="$N"
-	for config_path in $(find_config_paths); do
+	IFS=':'
+	for config_path in ${CONFIGS}; do
 		debug "reading config '$config_path'"
 		# Nonexistant file is not an error
 		[ -f "$config_path" ] || continue
@@ -129,6 +178,14 @@ read_config_paths() {
 			/use_xdg_terminals | use_xdg_terminals)
 				debug "found '$line' directive${XTE_STOCK_TERMINALS+ (ignored)}"
 				XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-false}
+				;;
+			/enable_cache)
+				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
+				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
+				;;
+			/disable_cache)
+				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
+				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
 			# `a sequence of non-empty elements separated by dots (U+002E FULL STOP),
@@ -188,23 +245,20 @@ replace() {
 
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
-	# Directory hierarchy that is searched for desktop entry files
-	data_directories="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
 	# Select which subdirectory to search for terminal emulators in:
 	# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
 	# 'applications', the standardised location for application desktop entry files
 	# When searching in 'applications', entries will be filtered based on their Category key
 	if check_bool "${XTE_STOCK_TERMINALS-true}"; then
-		data_subdirectory='applications'
+		debug "searching for terminal entries in 'applications' subdirs"
+		DATA_DIRECTORIES="${STOCK_DATA_DIRS}"
 	else
-		data_subdirectory='xdg-terminals'
+		debug "searching for terminal entries in 'xdg-terminals' subdirs"
+		DATA_DIRECTORIES="${XT_DATA_DIRS}"
 	fi
-	debug "searching for terminal entries in '$data_subdirectory'"
 	# Loop through paths
 	IFS=':'
-	for directory in $data_directories; do
-		# Normalise base path and append the data subdirectory with a trailing '/'
-		directory=${directory%/}/$data_subdirectory/
+	for directory in $DATA_DIRECTORIES; do
 		debug "searching '$directory'"
 		# Nonexistent directory is not an error
 		[ -d "$directory" ] || continue
@@ -218,7 +272,8 @@ find_entry_paths() {
 		done
 	done
 	# Convert all file path fragments into IDs in one operation
-	entry_ids=$(replace "${entry_ids-}" '/' '-')
+	entry_ids=$(printf '%s' "${entry_ids-}" | tr '/' '-')
+	#entry_ids=$(replace "${entry_ids-}" '/' '-')
 	# Loop through paths and IDs simultaneously
 	IFS="$N"
 	while read -r entry_path && read -r entry_id <&3; do
@@ -459,15 +514,19 @@ find_entry() {
 	IFS="$N"
 	for entry_id in ${ENTRY_IDS}${N}//fallback_start//${N}$FALLBACK_ENTRY_IDS; do
 		case "$entry_id" in
+		# entry has an action appended
 		*:*)
 			entry_action=${entry_id#*:}
 			entry_id=${entry_id%:*}
 			;;
+		# skip empty line
 		'') continue ;;
+		# fallback entries ahead, enable *ShowIn checks
 		'//fallback_start//')
 			de_checks=true
 			continue
 			;;
+		# nullify action
 		*) entry_action='' ;;
 		esac
 		validate_entry_action_id "$entry_id" "$entry_action" || continue
@@ -487,7 +546,7 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done
-	echo "No valid terminal entry was found in ${data_subdirectory}" >&2
+	echo "No valid terminal entry was found in ${DATA_DIRECTORIES}" >&2
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
@@ -495,27 +554,49 @@ alias find_entry='IFS= find_entry'
 
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
+
+# this will receive proper value later
+DATA_DIRECTORIES=''
+
 # path iterators
 make_paths
 
-# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
-# with duplicates removed
-ENTRY_IDS=''
-# All desktop entry ids found in data dirs in descending order of preference,
-# with duplicates (including those in $ENTRY_IDS) removed
-FALLBACK_ENTRY_IDS=''
+# At this point we have no way of telling if cache is enabled, unless XTE_CACHE_ENABLED is set to false,
+# so just try reading it as if default is true, otherwise do the usual thing.
+# Editing config to disable cache should invalidate the cache.
+# The true default is false though
+CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
+HASH=''
+CACHED_HASH=''
+CACHED_EXEC=''
+CACHED_EXECARG=''
 
-# Modifies $ENTRY_IDS
-read_config_paths
-# Modifies $ENTRY_IDS and sets global aliases
-find_entry_paths
+if check_bool "${XTE_CACHE_ENABLED-true}" && try_cache; then
+	debug "cache is valid"
+else
+	# continue with globals
 
-debug "final entry ID list:${ENTRY_IDS:+$N}$ENTRY_IDS
-end of final entry ID list"
-debug "final fallback entry ID list:${FALLBACK_ENTRY_IDS:+$N}$FALLBACK_ENTRY_IDS
-end of final fallback entry ID list"
+	# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
+	# with duplicates removed
+	ENTRY_IDS=''
+	# All desktop entry ids found in data dirs in descending order of preference,
+	# with duplicates (including those in $ENTRY_IDS) removed
+	FALLBACK_ENTRY_IDS=''
 
-find_entry || exit 1
+	# Modifies $ENTRY_IDS
+	read_config_paths
+	# Modifies $ENTRY_IDS and sets global aliases
+	find_entry_paths
+
+	debug "final entry ID list:${ENTRY_IDS:+$N}${ENTRY_IDS}${N}end of final entry ID list"
+	debug "final fallback entry ID list:${FALLBACK_ENTRY_IDS:+$N}${FALLBACK_ENTRY_IDS}${N}end of final fallback entry ID list"
+
+	# walk ID lists and find first applicable
+	find_entry || exit 1
+
+	# saves or disables cache
+	save_cache
+fi
 
 # Store original argument list, before it's modified
 ORIG_ARGV="$*"

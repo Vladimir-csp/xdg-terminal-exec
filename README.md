@@ -39,7 +39,7 @@ Where `${desktop}` is a lowercased string that can be matched (case-insensitive)
 
 Selection of data subdirectory is determined by (ordered by decreasing priority):
 
-- environment variable `XTE_STOCK_TERMINALS` (`true` or `false`)
+- environment variable `XTE_STOCK_TERMINALS` (truthy or falsy value)
 - the first encountered directive `/use_stock_applications` or `/use_xdg_terminals` in `*xdg-terminals.list` configs.
 - use stock entries by default.
 
@@ -112,10 +112,25 @@ Terminals that use `-e` but mangle arguments: sakura
 
 The shell code itself is quite optimized and fast, especially when using a slick `sh` implementation like `dash`.
 
-The most taxing part of the algorithm is reading all the desktop entry files for parsing to find a terminal among them.
+The most taxing part of the algorithm is reading all the desktop entry files for parsing them to find a terminal among them.
 
 Having a valid entry specified in `*xdg-terminals.list` speeds up the process significantly, shifting the bottleneck to
 composing the list of desktop entries.
 
 If storage sluggishness makes even this process too slow, swithcing to `xdg-terminals` data subdirs and populating them
 with only select few entries should speed things up even more.
+
+This implementation can also cache selected terminal for fast read at a cost of reading one file
+(`${XDG_CACHE_HOME:-$HOME/.cache}/xdg-terminal-exec`) and running `ls -LRl` and `md5sum` for all
+possible config file and data dir paths in one go. Valid cache bypasses reading of any other files.
+
+This feature is disabled by default and can be controlled by first encountered `/enable_cache`|`/disable_cache`
+direcive in the configs or `XTE_CACHE_ENABLED` env var (truthy or falsy value, has priority).
+
+Unless `XTE_CACHE_ENABLED` is false, an attempt at reading the cache file is always performed though.
+Its existence translates into initial assumption about cache feature state. If cache is invalid
+(which it should be if a config was edited to disable the cache), usual process of reading configs and
+entries will occur. The cache file is always removed when the script knows for sure that the cache feature
+is disabled.
+
+The plan is to eventually enable it by default for unattended fastness.
