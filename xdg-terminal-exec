@@ -76,42 +76,62 @@ gen_hash() {
 	read -r hash drop <<- EOH
 		$(
 			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
-			IFS=:
+			IFS=':'
+			debug "hashing '$hash_paths' IFS '$IFS'"
 			# shellcheck disable=SC2012,SC2086
 			LANG=C ls -LRl ${hash_paths} 2> /dev/null | md5sum 2> /dev/null
 		)
 	EOH
 	case "$hash" in
 	[0-9a-f]*[0-9a-f])
+		debug "got fresh hash '$hash'"
 		echo "$hash"
 		return 0
 		;;
-	*) return 1 ;;
+	*)
+		debug "failed to get fresh hash, got '$hash'"
+		return 1
+	 ;;
 	esac
 }
 
 read_cache() {
-	# reads $CACHED_HASH, $CACHED_EXEC, $CAHCED_EXECARG from cache file, otherwise returns 1
+	# reads $cached_hash, $cached_exec, $cached_execarg, $cached_cmd from cache file,
+	# checks if cache is valid and applies it, otherwise returns 1
 	if [ -f "${CACHE_FILE}" ]; then
 		IFS=${N}
 		line_num=1
 		# special case
-		CACHED_EXECARG=__UNDEFINED__
+		cached_execarg=__UNDEFINED__
 		while read -r line; do
 			case "$line_num" in
-			1) CACHED_HASH=$line ;;
-			2) CACHED_EXEC=$line ;;
-			3) CACHED_EXECARG=$line ;;
+			1) cached_hash=$line ;;
+			2) cached_exec=$line ;;
+			3) cached_execarg=$line ;;
+			4) cached_cmd=$line ;;
 			*) break ;;
 			esac
 			line_num=$((line_num + 1))
 		done < "${CACHE_FILE}"
-		if [ -z "$CACHED_HASH" ] || [ -z "$CACHED_EXEC" ] || [ "$CACHED_EXECARG" = "__UNDEFINED__" ]; then
+		if [ -z "$cached_hash" ] ||
+			[ -z "$cached_exec" ] ||
+			[ "$cached_execarg" = "__UNDEFINED__" ] ||
+			[ -z "$cached_cmd" ]; then
 			debug "invlaid cache data"
 			return 1
 		else
-			debug "got cache: ${N}${CACHED_HASH}${N}${CACHED_EXEC}${N}${CACHED_EXECARG}"
-			return 0
+			debug "got cache: ${N}${cached_hash}${N}${cached_exec}${N}${cached_execarg}${N}${cached_cmd}"
+			IFS=$OIFS
+			HASH=$(gen_hash) || return 1
+			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
+				debug "cache is actual"
+				EXEC=${cached_exec}
+				EXECARG=${cached_execarg}
+				return 0
+			else
+				debug "cache is out-of-date"
+				return 1
+			fi
 		fi
 	else
 		debug "no cache data"
@@ -121,32 +141,18 @@ read_cache() {
 # Mask IFS withing function to allow temporary changes
 alias read_cache='IFS= read_cache'
 
-try_cache() {
-	# checks if cache is valid and applies it, otherwise returns 1
-	read_cache || return 1
-	HASH=$(gen_hash) || return 1
-	# ${CACHED_EXEC} ${CACHED_EXECARG} are checked for non-emptiness in read_cache
-	if [ "$HASH" = "$CACHED_HASH" ]; then
-		EXEC=${CACHED_EXEC}
-		EXECARG=${CACHED_EXECARG}
-		return 0
-	else
-		return 1
-	fi
-}
-
 save_cache() {
-	# saves $HASH, $EXEC, $EXECARG to cache file or removes it if CACHE_ENABLE is false
+	# saves $HASH, $EXEC, $EXECARG, $1 (executable) to cache file or removes it if CACHE_ENABLE is false
 	if check_bool "$CACHE_ENABLED"; then
 		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
-		if [ -z "${HASH}" ]; then
+		if [ -z "${HASH-}" ]; then
 			HASH=$(gen_hash) || {
 				echo "could not hash listing, removing '${CACHE_FILE}'" >&2
 				rm -f "${CACHE_FILE}"
 				return 0
 			}
 		fi
-		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" > "${CACHE_FILE}"
+		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" "${1}" > "${CACHE_FILE}"
 		debug "saved cache: ${N}${HASH}${N}${EXEC}${N}${EXECARG}"
 	else
 		debug "cache is disabled, removing '${CACHE_FILE}'"
@@ -561,18 +567,16 @@ DATA_DIRECTORIES=''
 # path iterators
 make_paths
 
-# At this point we have no way of telling if cache is enabled, unless XTE_CACHE_ENABLED is set to false,
+# At this point we have no way of telling if cache is enabled or not, unless XTE_CACHE_ENABLED is set,
 # so just try reading it as if default is true, otherwise do the usual thing.
 # Editing config to disable cache should invalidate the cache.
-# The true default is false though
+# The true default is false though:
 CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
-HASH=''
-CACHED_HASH=''
-CACHED_EXEC=''
-CACHED_EXECARG=''
 
-if check_bool "${XTE_CACHE_ENABLED-true}" && try_cache; then
-	debug "cache is valid"
+# HASH can be reused
+HASH=''
+
+if check_bool "${XTE_CACHE_ENABLED-true}" && read_cache; then
 	CACHE_USED=true
 else
 	# continue with globals
@@ -595,9 +599,6 @@ else
 
 	# walk ID lists and find first applicable
 	find_entry || exit 1
-
-	# saves or disables cache
-	save_cache
 fi
 
 # Store original argument list, before it's modified
@@ -610,13 +611,9 @@ else
 	eval "set -- $EXEC"
 fi
 
-if [ "$CACHE_USED" = "true" ]; then
-	# in an unlikely case of false valid cache and missing command,
-	# drop the cache before failing
-	if ! command -v "$@" > /dev/null; then
-		echo "Dropping failed cache as selected command appears to be missing" >&2
-		rm -f "$CACHE_FILE"
-	fi
+if [ "$CACHE_USED" = "false" ]; then
+	# saves or disables cache
+	save_cache "$1"
 fi
 
 debug "EXEC=$EXEC
