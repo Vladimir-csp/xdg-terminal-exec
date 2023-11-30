@@ -573,8 +573,10 @@ CACHED_EXECARG=''
 
 if check_bool "${XTE_CACHE_ENABLED-true}" && try_cache; then
 	debug "cache is valid"
+	CACHE_USED=true
 else
 	# continue with globals
+	CACHE_USED=false
 
 	# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
 	# with duplicates removed
@@ -606,6 +608,15 @@ if [ "$#" -gt 0 ]; then
 	eval "set -- $EXEC ${EXECARG:+'"$EXECARG"'} \"\$@\""
 else
 	eval "set -- $EXEC"
+fi
+
+if [ "$CACHE_USED" = "true" ]; then
+	# in an unlikely case of false valid cache and missing command,
+	# drop the cache before failing
+	if ! command -v "$@" > /dev/null; then
+		echo "Dropping failed cache as selected command appears to be missing" >&2
+		rm -f "$CACHE_FILE"
+	fi
 fi
 
 debug "EXEC=$EXEC
