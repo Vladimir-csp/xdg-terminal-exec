@@ -108,14 +108,10 @@ alias read_config_paths='IFS= read_config_paths'
 
 # Check if newline delimited list $1 contains string $2
 contains() {
-	IFS="$N"
-	for item in $1; do
-		[ "$item" = "$2" ] && return 0
-	done
+	# This relies on fillers always being at both ends of the list
+	case "$1" in *"$N$2$N"*) return 0 ;; esac
 	return 1
 }
-# Mask IFS withing function to allow temporary changes
-alias contains='IFS= contains'
 
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
@@ -170,7 +166,7 @@ find_entry_paths() {
 			if alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1; then
 				debug "registered '$entry_path' as entry '$entry_id'"
 				# add as fallback ID if was not already listed
-				if ! contains "${ENTRY_IDS}${N}${FALLBACK_ENTRY_IDS}" "$entry_id"; then
+				if ! contains "A${N}${ENTRY_IDS}${N}${FALLBACK_ENTRY_IDS}${N}Z" "$entry_id"; then
 					FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
 					debug "added fallback ID '$entry_id'"
 				fi
