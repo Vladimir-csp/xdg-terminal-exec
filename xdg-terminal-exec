@@ -198,8 +198,11 @@ read_config_paths() {
 				;;
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
 			# `a sequence of non-empty elements separated by dots (U+002E FULL STOP),
-			# none of which starts with a digit, and each of which contains only characters from the set [A-Za-z0-9-_]`
-			[A-Za-z_]*.desktop | [A-Za-z_]*.desktop:[A-Za-z]*)
+			# none of which starts with a digit, and each of which contains only characters from the set [a-zA-Z0-9-_]`
+			# Stricter parts seem to be related only to reversed DNS notation but not common naming
+			# i.e. there is `2048-qt.desktop`.
+			# I do not know of any terminal that starts with a number, but it's valid.
+			[a-zA-Z0-9_]*)
 				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
 				debug "added ID '$line'"
 				;;
@@ -450,7 +453,7 @@ read_entry_path() {
 		# if entry_action is not requested, allow reading Exec right away from the main group
 		'[Desktop Entry]'*) [ -z "$entry_action" ] && read_exec=true ;;
 		# A `Key=Value` pair
-		[A-Za-z0-9-]*)
+		[a-zA-Z0-9-]*)
 			# Split value from pair
 			value=${line#*=}
 			# Remove all but leading spaces, and trim that from the value
@@ -475,46 +478,35 @@ read_entry_path() {
 }
 
 validate_entry_action_id() {
-	# validates entry and action ID strings
-	check_entry_id=${1}
-	check_action_id=${2}
+	# validates entry ($1) and action ID ($2) strings
 	check=true
 
-	case "$check_entry_id" in
-	*.desktop)
-		check2_entry_id=${check_entry_id%.desktop}
-		while [ -n "$check2_entry_id" ]; do
-			# cut [[:alnum:]-_.] one by one, fail if cut did not happen
-			cut_check2_entry_id=${check2_entry_id%[[:alnum:]-_.]}
-			if [ "$check2_entry_id" != "$cut_check2_entry_id" ]; then
-				check2_entry_id="$cut_check2_entry_id"
-			else
-				echo "Skipping unsupported Entry ID '$check_entry_id'" >&2
-				check=false
-				break
-			fi
-		done
+	case "$1" in
+	# invalid characters or degrees of emptiness
+	*[!a-zA-Z0-9-_.]* | *[!a-zA-Z0-9-_.] | [!a-zA-Z0-9-_.]* | [!a-zA-Z0-9-_.] | '' | .desktop)
+		echo "Skipping unsupported Entry ID '$1'" >&2
+		check=false
 		;;
+	# all that left with .desktop
+	*.desktop) true ;;
+	# and without
 	*)
-		echo "Skipping unsupported Entry ID '$check_entry_id'" >&2
+		echo "Skipping unsupported Entry ID '$1'" >&2
 		check=false
 		;;
 	esac
 
-	check2_action_id="$check_action_id"
-	while [ -n "$check2_action_id" ]; do
-		# cut [A-Za-z0-9-] one by one, fail if cut did not happen
-		cut_check2_action_id=${check2_action_id%[A-Za-z0-9-]}
-		if [ "$check2_action_id" != "$cut_check2_action_id" ]; then
-			check2_action_id="$cut_check2_action_id"
-		else
-			echo "Invalid action ID '$check_action_id'" >&2
-			check=false
-			break
-		fi
-	done
+	case "$2" in
+	# invalid characters
+	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
+		echo "Invalid action ID '$check_action_id'" >&2
+		check=false
+		;;
+	# all that left or nothing
+	'' | *) true ;;
+	esac
 
-	case "$check" in true) return 0 ;; false) return 1 ;; esac
+	[ "$check" = "true" ] && return 0 || return 1
 }
 
 # Loop through IDs and try to find a valid entry
