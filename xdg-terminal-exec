@@ -76,9 +76,9 @@ gen_hash() {
 	read -r hash drop <<- EOH
 		$(
 			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
-			debug "hashing 'XDG_CURRENT_DESKTOP' '$hash_paths'"
+			debug "hashing '${XDG_CURRENT_DESKTOP-}' '$hash_paths'"
 			{
-				echo "$XDG_CURRENT_DESKTOP"
+				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
 				# shellcheck disable=SC2012,SC2086
 				LANG=C ls -LRl ${hash_paths} 2> /dev/null
