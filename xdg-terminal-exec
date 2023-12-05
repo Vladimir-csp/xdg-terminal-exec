@@ -76,10 +76,13 @@ gen_hash() {
 	read -r hash drop <<- EOH
 		$(
 			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
-			IFS=':'
-			debug "hashing '$hash_paths' IFS '$IFS'"
-			# shellcheck disable=SC2012,SC2086
-			LANG=C ls -LRl ${hash_paths} 2> /dev/null | md5sum 2> /dev/null
+			debug "hashing 'XDG_CURRENT_DESKTOP' '$hash_paths'"
+			{
+				echo "$XDG_CURRENT_DESKTOP"
+				IFS=':'
+				# shellcheck disable=SC2012,SC2086
+				LANG=C ls -LRl ${hash_paths} 2> /dev/null
+			} | md5sum 2> /dev/null
 		)
 	EOH
 	case "$hash" in
@@ -495,7 +498,7 @@ validate_entry_action_id() {
 	case "$2" in
 	# invalid characters
 	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
-		echo "Invalid action ID '$check_action_id'" >&2
+		echo "Invalid action ID '$2'" >&2
 		check=false
 		;;
 	# all that left or nothing
