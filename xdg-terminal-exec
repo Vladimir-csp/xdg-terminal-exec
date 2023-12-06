@@ -24,18 +24,7 @@ OIFS="$IFS"
 N='
 '
 
-check_bool() {
-	case "$1" in
-	true | True | TRUE | yes | Yes | YES | 1) return 0 ;;
-	false | False | FALSE | no | No | NO | 0) return 1 ;;
-	*)
-		echo "Assuming '$1' means no" >&2
-		return 1
-		;;
-	esac
-}
-
-if check_bool "${DEBUG-0}"; then
+if [ "${DEBUG-0}" = 1 ]; then
 	debug() { printf '%s\n' "$1" >&2; }
 else
 	debug() { :; }
@@ -118,10 +107,10 @@ find_entry_paths() {
 	# Directory hierarchy that is searched for desktop entry files
 	data_directories="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share/:/usr/share/}"
 	# Select which subdirectory to search for terminal emulators in:
-	# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
-	# 'applications', the standardised location for application desktop entry files
+	# 'xdg-terminals', a sepparate directory that exists for this script specifically,
+	# 'applications', the standardised location for application desktop entry files (default)
 	# When searching in 'applications', entries will be filtered based on their Category key
-	if check_bool "${XTE_STOCK_TERMINALS-true}"; then
+	if [ "${XTE_STOCK_TERMINALS-}" != 'false' ]; then
 		data_subdirectory='applications'
 	else
 		data_subdirectory='xdg-terminals'
@@ -200,7 +189,7 @@ check_entry_key() {
 	case $key in
 	'Categories'*=*)
 		# Enforce only if reading from 'applications' subdirectory
-		! check_bool "${XTE_STOCK_TERMINALS-true}" && return 0
+		[ "${XTE_STOCK_TERMINALS-}" != 'false' ] && return 0
 		debug "checking for 'TerminalEmulator' in Categories '$value'"
 		IFS=';'
 		for category in $value; do
@@ -401,7 +390,7 @@ find_entry() {
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
 		# ensure entry is a Terminal Emulator when using stock applications
-		check_bool "${XTE_STOCK_TERMINALS-true}" && [ -z "${TERMINAL-}" ] && continue
+		[ "${XTE_STOCK_TERMINALS-}" != 'false' ] && [ -z "${TERMINAL-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop
