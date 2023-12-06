@@ -297,12 +297,11 @@ check_entry_key() {
 	key="$1"
 	value="$2"
 	action="$3"
-	read_exec="$4"
-	de_checks="$5"
+	de_checks="$4"
 
 	# Order of checks is important
 	case $key in
-	'Categories'*=*)
+	'Categories')
 		debug "checking for 'TerminalEmulator' in Categories '$value'"
 		IFS=';'
 		for category in $value; do
@@ -314,7 +313,7 @@ check_entry_key() {
 		# Default in this case is to fail
 		return 1
 		;;
-	'Actions'*=*)
+	'Actions')
 		# `It is not valid to have an action group for an action identifier not mentioned in the Actions key.
 		# Such an action group must be ignored by implementors.`
 		# ignore if no action requested
@@ -327,7 +326,7 @@ check_entry_key() {
 		# Default in this case is to fail
 		return 1
 		;;
-	'OnlyShowIn'*=*)
+	'OnlyShowIn')
 		case "$de_checks" in
 		true) debug "checking for intersecion between '${XDG_CURRENT_DESKTOP-}' and OnlyShowIn '$value'" ;;
 		false)
@@ -345,7 +344,7 @@ check_entry_key() {
 		# Default in this case is to fail
 		return 1
 		;;
-	'NotShowIn'*=*)
+	'NotShowIn')
 		case "$de_checks" in
 		true) debug "checking for intersecion between '${XDG_CURRENT_DESKTOP-}' and NotShowIn '$value'" ;;
 		false)
@@ -364,26 +363,25 @@ check_entry_key() {
 		# Default in this case is to succeed
 		return 0
 		;;
-	'X-ExecArg'*=* | 'ExecArg'*=*)
+	'X-ExecArg' | 'ExecArg')
 		# Set global variable
 		EXECARG=$value
 		debug "read ExecArg '$EXECARG'"
 		;;
-	'TryExec'*=*)
+	'TryExec')
 		debug "checking TryExec executable '$value'"
 		command -v "$value" > /dev/null || return 1
 		;;
-	'Hidden'*=*)
+	'Hidden')
 		debug "checking boolean Hidden '$value'"
 		[ "$value" = 'true' ] && return 1
 		;;
-	'Exec'*=*)
-		case "$read_exec" in
-		false)
-			debug "ignored Exec from wrong section"
+	'Exec')
+		# Only read key from requested group, marked by unset action ID
+		if [ -n "$entry_action" ]; then
+			debug "ignored Exec from wrong group"
 			return 0
-			;;
-		esac
+		fi
 		debug "read Exec '$value'"
 		# Set global variable
 		EXEC=$value
@@ -404,35 +402,29 @@ read_entry_path() {
 	entry_path="$1"
 	entry_action="$2"
 	de_checks="$3"
-	read_exec=false
-	# shellcheck disable=SC2016
-	debug "reading desktop entry '$entry_path'${entry_action:+ action '}$entry_action${entry_action:+'}"
-	# Let `read` trim leading/trailing whitespace from the line
-	while IFS="$OIFS" read -r line; do
-		case $line in
-		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
-		# if entry_action is not requested, allow reading Exec right away from the main group
-		'[Desktop Entry]'*) [ -z "$entry_action" ] && read_exec=true ;;
+
+	debug "reading desktop entry '$entry_path' ${entry_action:+"action '$entry_action'"}"
+	# Let `read` trim leading/trailing spaces from the key and value
+	while IFS="= " read -r key value; do
+		# Rejoin the line for easier checks
+		case "$key $value" in
+		# Consume the main entry group
+		'[Desktop Entry]') ;;
+		# Consume given action group
+		"[Desktop Action ${entry_action-}]") unset entry_action ;;
+		# Start of the next group header, stop if action has been consumed
+		'['*) [ -z "${entry_action-}" ] && break ;;
 		# A `Key=Value` pair
 		[a-zA-Z0-9-]*)
-			# Split value from pair
-			value=${line#*=}
-			# Remove all but leading spaces, and trim that from the value
-			value=${value#"${value%%[! ]*}"}
-			# Check the key
-			check_entry_key "$line" "$value" "$entry_action" "$read_exec" "$de_checks" && continue
+			# Check the pair and continue if valid
+			check_entry_key "$key" "$value" "${entry_action-}" "$de_checks" && continue
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
 			unset TERMINAL
-			# shellcheck disable=SC2016
 			debug "entry discarded"
 			return 1
 			;;
-		# found requested action, allow reading Exec
-		"[Desktop Action ${entry_action}]"*) read_exec=true ;;
-		# Start of the next group header, stop if already read exec
-		'['*) [ "$read_exec" = "true" ] && break ;;
 		esac
 		# By default empty lines and comments get ignored
 	done < "$entry_path"
