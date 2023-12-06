@@ -68,7 +68,6 @@ alias find_config_paths='IFS= find_config_paths'
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
-	# This allows for easier deduplication, when adding fallback IDs later on
 	IFS="$N"
 	for config_path in $(find_config_paths); do
 		debug "reading config '$config_path'"
@@ -105,13 +104,6 @@ read_config_paths() {
 }
 # Mask IFS withing function to allow temporary changes
 alias read_config_paths='IFS= read_config_paths'
-
-# Check if newline delimited list $1 contains string $2
-contains() {
-	# This relies on fillers always being at both ends of the list
-	case "$1" in *"$N$2$N"*) return 0 ;; esac
-	return 1
-}
 
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
@@ -165,11 +157,9 @@ find_entry_paths() {
 			# shellcheck disable=SC2139
 			if alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1; then
 				debug "registered '$entry_path' as entry '$entry_id'"
-				# add as fallback ID if was not already listed
-				if ! contains "A${N}${ENTRY_IDS}${N}${FALLBACK_ENTRY_IDS}${N}Z" "$entry_id"; then
-					FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
-					debug "added fallback ID '$entry_id'"
-				fi
+				# Add as a fallback ID regardles if it's a duplicate
+				FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
+				debug "added fallback ID '$entry_id'"
 			else
 				echo "skipped '$entry_path' due to unsupported filename" >&2
 			fi
@@ -397,6 +387,8 @@ find_entry() {
 		alias "$entry_id" > /dev/null 2>&1 || continue
 		# Evaluates the alias, it sets $entry_path
 		eval "$entry_id"
+		# Unset the alias, so duplicate entries are skipped
+		unalias "$entry_id"
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
@@ -413,13 +405,13 @@ find_entry() {
 # Mask IFS withing function to allow temporary changes
 alias find_entry='IFS= find_entry'
 
-# All desktop entry ids in descending order of preference from *xdg-terminals.list configs, with duplicates removed
+# All desktop entry ids in descending order of preference from *xdg-terminals.list configs
 ENTRY_IDS=''
-# All desktop entry ids found in data dirs in descending order of preference, with duplicates (including $ENTRY_IDS) removed
+# All desktop entry ids found in data dirs in descending order of preference
 FALLBACK_ENTRY_IDS=''
 # Modifies $ENTRY_IDS
 read_config_paths
-# Modifies $ENTRY_IDS and sets global aliases
+# Modifies $FALLBACK_ENTRY_IDS and sets global aliases
 find_entry_paths
 
 debug "final entry ID list:${ENTRY_IDS:+$N}$ENTRY_IDS
