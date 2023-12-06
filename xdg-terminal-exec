@@ -25,7 +25,7 @@ N='
 '
 
 # Utility function to print messages to stderr
-error() { printf '%s\n' "$1" >&2; }
+error() { printf '%s\n' "$@" >&2; }
 
 check_bool() {
 	case "$1" in
@@ -38,11 +38,11 @@ check_bool() {
 	esac
 }
 
-# Check whether to enable debug messages
+# Utility function to print debug messages to stderr (or not)
 if check_bool "${DEBUG-0}"; then
-	alias debug='error'
+	debug() { printf '%s\n' "$@" >&2; }
 else
-	alias debug=':'
+	debug() { :; }
 fi
 
 # Find and print all config file paths
