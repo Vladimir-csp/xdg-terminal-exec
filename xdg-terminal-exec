@@ -342,7 +342,7 @@ validate_entry_action_id() {
 
 	case "$1" in
 	# invalid characters or degrees of emptiness
-	*[!a-zA-Z0-9-_.]* | *[!a-zA-Z0-9-_.] | [!a-zA-Z0-9-_.]* | [!a-zA-Z0-9-_.] | '' | .desktop)
+	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
 		echo "Skipping unsupported Entry ID '$1'" >&2
 		check=false
 		;;
