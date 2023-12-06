@@ -24,21 +24,25 @@ OIFS="$IFS"
 N='
 '
 
+# Utility function to print messages to stderr
+error() { printf '%s\n' "$1" >&2; }
+
 check_bool() {
 	case "$1" in
 	true | True | TRUE | yes | Yes | YES | 1) return 0 ;;
 	false | False | FALSE | no | No | NO | 0) return 1 ;;
 	*)
-		echo "Assuming '$1' means no" >&2
+		error "Assuming '$1' means no"
 		return 1
 		;;
 	esac
 }
 
+# Check whether to enable debug messages
 if check_bool "${DEBUG-0}"; then
-	debug() { printf '%s\n' "$1" >&2; }
+	alias debug='error'
 else
-	debug() { :; }
+	alias debug=':'
 fi
 
 # Find and print all config file paths
@@ -161,7 +165,7 @@ find_entry_paths() {
 				FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
 				debug "added fallback ID '$entry_id'"
 			else
-				echo "skipped '$entry_path' due to unsupported filename" >&2
+				error "skipped '$entry_path' due to unsupported filename"
 			fi
 		fi
 		# Use '//' as delimiter, as it can't be found within valid paths nor IDs
@@ -333,14 +337,14 @@ validate_entry_action_id() {
 	case "$1" in
 	# invalid characters or degrees of emptiness
 	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
-		echo "Skipping unsupported Entry ID '$1'" >&2
+		error "Skipping unsupported Entry ID '$1'"
 		check=false
 		;;
 	# all that left with .desktop
 	*.desktop) true ;;
 	# and without
 	*)
-		echo "Skipping unsupported Entry ID '$1'" >&2
+		error "Skipping unsupported Entry ID '$1'"
 		check=false
 		;;
 	esac
@@ -348,7 +352,7 @@ validate_entry_action_id() {
 	case "$2" in
 	# invalid characters
 	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
-		echo "Invalid action ID '$check_action_id'" >&2
+		error "Invalid action ID '$2'"
 		check=false
 		;;
 	# all that left or nothing
@@ -399,7 +403,7 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done
-	echo "No valid terminal entry was found in ${data_subdirectory}" >&2
+	error "No valid terminal entry was found in ${data_subdirectory}"
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
