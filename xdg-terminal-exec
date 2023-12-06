@@ -134,7 +134,7 @@ find_entry_paths() {
 		# Loop through paths
 		IFS="$N"
 		# Print order of found files is unpredictable, sort them
-		for entry_path in $(find -L "$directory" -type f -name '[[:alnum:]-_.]*.desktop' | sort); do
+		for entry_path in $(find -L "$directory" -type f -name '*.desktop' ! -path "$directory/*[^[:alnum:]_./-]*" | sort); do
 			entry_paths=${entry_paths:+${entry_paths}${N}}$entry_path
 			# Remove data directory path from ID
 			entry_ids=${entry_ids:+${entry_ids}${N}}${entry_path#"$directory"}
