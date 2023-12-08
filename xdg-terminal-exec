@@ -84,6 +84,7 @@ gen_hash() {
 			{
 				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
+				# shellcheck disable=SC2086
 				debug ">     hashing '${XDG_CURRENT_DESKTOP-}' and listing of:" $hash_paths "^     end of hash listing"
 				# shellcheck disable=SC2012,SC2086
 				LANG=C ls -LRl ${hash_paths} 2> /dev/null
@@ -216,7 +217,7 @@ read_config_paths() {
 			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
 			[a-zA-Z0-9_]*)
 				# consider only the first ':' as a delimiter
-				IFS=':' read entry_id action_id <<- EOL
+				IFS=':' read -r entry_id action_id <<- EOL
 					$line
 				EOL
 				if validate_entry_id "${entry_id}" && validate_action_id "${action_id}"; then
@@ -561,7 +562,8 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done
-	error "No valid terminal entry was found in ${data_subdirectory}"
+	# shellcheck disable=SC2086
+	IFS=':' error "No valid terminal entry was found in:" ${DATA_DIRECTORIES}
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
@@ -603,7 +605,9 @@ else
 	# Modifies $ENTRY_IDS and sets global aliases
 	find_entry_paths
 
+	# shellcheck disable=SC2086
 	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
+	# shellcheck disable=SC2086
 	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
 
 	# walk ID lists and find first applicable
