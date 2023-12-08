@@ -40,7 +40,7 @@ check_bool() {
 
 # Utility function to print debug messages to stderr (or not)
 if check_bool "${DEBUG-0}"; then
-	debug() { printf '%s\n' "$@" >&2; }
+	debug() { printf 'D: %s\n' "$@" >&2; }
 else
 	debug() { :; }
 fi
@@ -69,21 +69,22 @@ make_paths() {
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
 	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
 
-	debug "paths: ${N}CONFIGS ${CONFIGS}${N}STOCK_DATA_DIRS ${STOCK_DATA_DIRS}${N}XT_DATA_DIRS ${XT_DATA_DIRS}"
+	debug "paths:" "CONFIGS=${CONFIGS}" "STOCK_DATA_DIRS=${STOCK_DATA_DIRS}" "XT_DATA_DIRS=${XT_DATA_DIRS}"
 }
 # Mask IFS withing function to allow temporary changes
 alias make_paths='IFS= make_paths'
 
 gen_hash() {
-	# return md5 of ls output for config and data paths
+	# return md5 of XDG_CURRENT DESKTOP and ls -LRl output for config and data paths
+	# md5 is 4x faster than sha*, and there is no need for cryptography here
 	# shellcheck disable=SC2034
 	read -r hash drop <<- EOH
 		$(
 			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
-			debug "hashing '${XDG_CURRENT_DESKTOP-}' '$hash_paths'"
 			{
 				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
+				debug ">     hashing '${XDG_CURRENT_DESKTOP-}' and listing of:" $hash_paths "^     end of hash listing"
 				# shellcheck disable=SC2012,SC2086
 				LANG=C ls -LRl ${hash_paths} 2> /dev/null
 			} | md5sum 2> /dev/null
@@ -127,7 +128,7 @@ read_cache() {
 			esac
 		done < "${CACHE_FILE}"
 		if [ "$line_num" = "4" ]; then
-			debug "got cache: ${N}${cached_hash}${N}${cached_exec}${N}${cached_execarg}${N}${cached_cmd}"
+			debug "got cache:" "${cached_hash}" "${cached_exec}" "${cached_execarg}" "${cached_cmd}"
 			IFS=$OIFS
 			HASH=$(gen_hash) || return 1
 			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
@@ -163,7 +164,7 @@ save_cache() {
 			}
 		fi
 		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" "${1}" > "${CACHE_FILE}"
-		debug "saved cache: ${N}${HASH}${N}${EXEC}${N}${EXECARG}"
+		debug ">     saved cache:" "${HASH}" "${EXEC}" "${EXECARG}" "${1}" "^     end of saved cache"
 	else
 		debug "cache is disabled, removing '${CACHE_FILE}'"
 		rm -f "${CACHE_FILE}"
@@ -602,15 +603,15 @@ else
 	# Modifies $ENTRY_IDS and sets global aliases
 	find_entry_paths
 
-	debug "final entry ID list:${ENTRY_IDS:+$N}${ENTRY_IDS}${N}end of final entry ID list"
-	debug "final fallback entry ID list:${FALLBACK_ENTRY_IDS:+$N}${FALLBACK_ENTRY_IDS}${N}end of final fallback entry ID list"
+	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
+	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
 
 	# walk ID lists and find first applicable
 	find_entry || exit 1
 fi
 
 # Store original argument list, before it's modified
-ORIG_ARGV="$*"
+debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
 if [ "$#" -gt 0 ]; then
@@ -619,16 +620,11 @@ else
 	eval "set -- $EXEC"
 fi
 
+debug ">     final args:" "$@" "^     end of final args"
+
 if [ "$CACHE_USED" = "false" ]; then
 	# saves or removes cache, forked out of the way
 	save_cache "$1" &
 fi
-
-debug "EXEC=$EXEC
-EXECARG=$EXECARG
-ARGV=$ORIG_ARGV
-final argv (>arg< per line):
-$(printf '>%s<\n' "$@")
-end of final argv"
 
 exec "$@"
