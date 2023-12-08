@@ -184,6 +184,8 @@ read_config_paths() {
 		while IFS="$OIFS" read -r line; do
 			#debug "read line '$line'"
 			case $line in
+
+			# Catch directives first
 			# Whether to search for entries in 'xdg-terminals' or 'applications'
 			# Can be overriden by $XTE_STOCK_TERMINALS
 			/use_stock_applications | use_stock_applications)
@@ -202,16 +204,28 @@ read_config_paths() {
 				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
+
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
 			# `a sequence of non-empty elements separated by dots (U+002E FULL STOP),
 			# none of which starts with a digit, and each of which contains only characters from the set [a-zA-Z0-9-_]`
 			# Stricter parts seem to be related only to reversed DNS notation but not common naming
 			# i.e. there is `2048-qt.desktop`.
 			# I do not know of any terminal that starts with a number, but it's valid.
+
+			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
 			[a-zA-Z0-9_]*)
-				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
-				debug "added ID '$line'"
+				# consider only the first ':' as a delimiter
+				IFS=':' read entry_id action_id <<- EOL
+					$line
+				EOL
+				if validate_entry_id "${entry_id}" && validate_action_id "${action_id}"; then
+					ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
+					debug "added entry ID with action ID '$line'"
+				else
+					error "Discarded possibly misspelled entry '$line'"
+				fi
 				;;
+
 			esac
 			# By default empty lines and comments get ignored
 		done < "$config_path"
@@ -271,8 +285,9 @@ find_entry_paths() {
 		[ -d "$directory" ] || continue
 		# Loop through paths
 		IFS="$N"
+		# Find all desktop entries with valid names
 		# Print order of found files is unpredictable, sort them
-		for entry_path in $(find -L "$directory" -type f -name '[[:alnum:]-_.]*.desktop' | sort); do
+		for entry_path in $(find -L "$directory" -type f -name '[a-zA-Z0-9_]*.desktop' '!' -name '*[^a-zA-Z0-9_.-]*' | sort); do
 			entry_paths=${entry_paths:+${entry_paths}${N}}$entry_path
 			# Remove data directory path from ID
 			entry_ids=${entry_ids:+${entry_ids}${N}}${entry_path#"$directory"}
@@ -281,6 +296,7 @@ find_entry_paths() {
 	# Convert all file path fragments into IDs in one operation
 	entry_ids=$(printf '%s' "${entry_ids-}" | tr '/' '-')
 	#entry_ids=$(replace "${entry_ids-}" '/' '-')
+	debug "registering entries"
 	# Loop through paths and IDs simultaneously
 	IFS="$N"
 	while read -r entry_path && read -r entry_id <&3; do
@@ -304,7 +320,7 @@ find_entry_paths() {
 				FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
 				debug "added fallback ID '$entry_id'"
 			else
-				error "skipped '$entry_path' due to unsupported filename"
+				error "Skipped '$entry_path' due to unsupported filename"
 			fi
 		fi
 		# Use '//' as delimiter, as it can't be found within valid paths nor IDs
@@ -469,36 +485,39 @@ read_entry_path() {
 	done < "$entry_path"
 }
 
-validate_entry_action_id() {
-	# validates entry ($1) and action ID ($2) strings
-	check=true
+validate_entry_id() {
+	# validates entry ID ($1)
 
 	case "$1" in
 	# invalid characters or degrees of emptiness
 	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
-		error "Skipping unsupported Entry ID '$1'"
-		check=false
+		debug "string not valid as Entry ID: '$1'"
+		return 1
 		;;
 	# all that left with .desktop
-	*.desktop) true ;;
+	*.desktop) return 0 ;;
 	# and without
 	*)
-		error "Skipping unsupported Entry ID '$1'"
-		check=false
+		debug "string not valid as Entry ID '$1'"
+		return 1
 		;;
 	esac
+}
 
-	case "$2" in
+validate_action_id() {
+	# validates action ID ($1)
+
+	case "$1" in
+	# empty is ok
+	'') return 0 ;;
 	# invalid characters
 	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
-		error "Invalid action ID '$2'"
-		check=false
+		debug "string not valid as Action ID: '$1'"
+		return 1
 		;;
-	# all that left or nothing
-	'' | *) true ;;
+	# all that left
+	*) return 0 ;;
 	esac
-
-	[ "$check" = "true" ] && return 0 || return 1
 }
 
 # Loop through IDs and try to find a valid entry
@@ -523,7 +542,6 @@ find_entry() {
 		# nullify action
 		*) entry_action='' ;;
 		esac
-		validate_entry_action_id "$entry_id" "$entry_action" || continue
 
 		debug "matching path for entry ID '$entry_id'"
 		# Check if a matching path was found for ID
