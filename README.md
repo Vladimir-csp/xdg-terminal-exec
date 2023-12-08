@@ -134,8 +134,9 @@ populating them with only select few entries should speed things up even more.
 ## Cache
 
 This implementation can also cache selected terminal for fast read at a cost of reading one file
-(`${XDG_CACHE_HOME:-$HOME/.cache}/xdg-terminal-exec`) and running `ls -LRl` and `md5sum` for all
-possible config file and data dir paths in one go. Valid cache bypasses reading of any other file.
+(`${XDG_CACHE_HOME:-$HOME/.cache}/xdg-terminal-exec`) and feeding `md5sum` the value of `$XDG_CURRENT_DESKTOP`
+and output of `ls -LRl` for all possible config file and data dir paths in one go.
+Valid cache bypasses reading of any other file.
 
 This feature is disabled by default and can be controlled by first encountered `/enable_cache`|`/disable_cache`
 direcive in the configs or `XTE_CACHE_ENABLED` env var (truthy or falsy value, has priority).
