@@ -164,7 +164,10 @@ save_cache() {
 				return 0
 			}
 		fi
+		UM=$(umask)
+		umask 0077
 		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" "${1}" > "${CACHE_FILE}"
+		umask "$UM"
 		debug ">     saved cache:" "${HASH}" "${EXEC}" "${EXECARG}" "${1}" "^     end of saved cache"
 	else
 		debug "cache is disabled, removing '${CACHE_FILE}'"
