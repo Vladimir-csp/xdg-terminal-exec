@@ -7,12 +7,8 @@ Proposal for XDG terminal execution utility and default terminal specification. 
 This configuration spec is crafted in image of [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html)
 and fully relies on [basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html).
 
-Terminal emulators (with their exec arguments) are described by Desktop Entries:
-
-- stock entries located in `applications` subdirs of XDG data hierarchy and marked by `TerminalEmulator` category
-- alternatively, separate or symlinked entries placed in parallel `xdg-terminals` subdirs of XDG data hierarchy
-
-Selection mechanism is described below.
+Terminal emulators (with their exec arguments) are described by stock Desktop Entries
+located in `applications` subdirs of XDG data hierarchy and marked by `TerminalEmulator` category.
 
 Preferred terminals are configured by listing their [entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s02.html#desktop-file-id)
 in config files named `${desktop}-xdg-terminals.list` or `xdg-terminals.list` placed in XDG config hierarchy.
@@ -35,24 +31,13 @@ Default paths used by utility are resolved into:
   - `${HOME}/.config/xdg-terminals.list`
   - `/etc/xdg/${desktop}-xdg-terminals.list`
   - `/etc/xdg/xdg-terminals.list`
-- data (in `${XDG_DATA_HOME}:${XDG_DATA_DIRS}`):
-  - stock applications:
-    - `${HOME}/.local/share/applications/`
-    - `/usr/local/share/applications/`
-    - `/usr/share/applications/`
-  - separate xdg-terminals:
-    - `${HOME}/.local/share/xdg-terminals/`
-    - `/usr/local/share/xdg-terminals/`
-    - `/usr/share/xdg-terminals/`
+- desktop entries (in `${XDG_DATA_HOME}:${XDG_DATA_DIRS}`):
+  - `${HOME}/.local/share/applications/`
+  - `/usr/local/share/applications/`
+  - `/usr/share/applications/`
 
 Where `${desktop}` is a lowercased string that can be matched (case-insensitively) against items of `$XDG_CURRENT_DESKTOP`
 (a colon-separated list of names for the current DE).
-
-Selection of data subdirectory is determined by (in order of decreasing priority):
-
-- environment variable `XTE_STOCK_TERMINALS` (truthy or falsy value)
-- the first encountered directive `/use_stock_applications` or `/use_xdg_terminals` in `*xdg-terminals.list` configs.
-- the default is to use stock entries
 
 ## Priority of selecting an entry
 
@@ -91,6 +76,9 @@ If run without any arguments, only the terminal itself (value of `Exec=`) is exe
 
 If a command (with or witout its arguments) is given, then values of both `Exec=` and `X-ExecArg=` (if not explicitly empty)
 are used, along with provided command and arguments that are transmitted as is.
+
+If `-e` or matching execution argument is given explicitly as the first argument on the command line, it should be discarded for
+backwards compatibility with software that hardcodes these arguments.
 
 The resulting command is executed without forking.
 

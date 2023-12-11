@@ -61,15 +61,14 @@ make_paths() {
 	# data dirs
 	for dir in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
-		STOCK_DATA_DIRS=${STOCK_DATA_DIRS-}${STOCK_DATA_DIRS:+:}${dir%/}/applications/
-		XT_DATA_DIRS=${XT_DATA_DIRS-}${XT_DATA_DIRS:+:}${dir%/}/xdg-terminals/
+		APPLICATIONS_DIRS=${APPLICATIONS_DIRS-}${APPLICATIONS_DIRS:+:}${dir%/}/applications/
 	done
 
 	# cache
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
 	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
 
-	debug "paths:" "CONFIGS=${CONFIGS}" "STOCK_DATA_DIRS=${STOCK_DATA_DIRS}" "XT_DATA_DIRS=${XT_DATA_DIRS}"
+	debug "paths:" "CONFIGS=${CONFIGS}" "APPLICATIONS_DIRS=${APPLICATIONS_DIRS}"
 }
 # Mask IFS withing function to allow temporary changes
 alias make_paths='IFS= make_paths'
@@ -80,7 +79,7 @@ gen_hash() {
 	# shellcheck disable=SC2034
 	read -r hash drop <<- EOH
 		$(
-			hash_paths="${CONFIGS}:${STOCK_DATA_DIRS}:${XT_DATA_DIRS}"
+			hash_paths="${CONFIGS}:${APPLICATIONS_DIRS}"
 			{
 				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
@@ -191,16 +190,8 @@ read_config_paths() {
 			case $line in
 
 			# Catch directives first
-			# Whether to search for entries in 'xdg-terminals' or 'applications'
-			# Can be overriden by $XTE_STOCK_TERMINALS
-			/use_stock_applications | use_stock_applications)
-				debug "found '$line' directive${XTE_STOCK_TERMINALS+ (ignored)}"
-				XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-true}
-				;;
-			/use_xdg_terminals | use_xdg_terminals)
-				debug "found '$line' directive${XTE_STOCK_TERMINALS+ (ignored)}"
-				XTE_STOCK_TERMINALS=${XTE_STOCK_TERMINALS-false}
-				;;
+
+			# cache control
 			/enable_cache)
 				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
@@ -271,20 +262,10 @@ replace() {
 
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
-	# Select which subdirectory to search for terminal emulators in:
-	# 'xdg-terminals', a sepparate directory that exists for this script specifically (default),
-	# 'applications', the standardised location for application desktop entry files
 	# When searching in 'applications', entries will be filtered based on their Category key
-	if check_bool "${XTE_STOCK_TERMINALS-true}"; then
-		debug "searching for terminal entries in 'applications' subdirs"
-		DATA_DIRECTORIES="${STOCK_DATA_DIRS}"
-	else
-		debug "searching for terminal entries in 'xdg-terminals' subdirs"
-		DATA_DIRECTORIES="${XT_DATA_DIRS}"
-	fi
 	# Loop through paths
 	IFS=':'
-	for directory in $DATA_DIRECTORIES; do
+	for directory in $APPLICATIONS_DIRS; do
 		debug "searching '$directory'"
 		# Nonexistent directory is not an error
 		[ -d "$directory" ] || continue
@@ -353,8 +334,6 @@ check_entry_key() {
 	# Order of checks is important
 	case $key in
 	'Categories'*=*)
-		# Enforce only if reading from 'applications' subdirectory
-		! check_bool "${XTE_STOCK_TERMINALS-true}" && return 0
 		debug "checking for 'TerminalEmulator' in Categories '$value'"
 		IFS=';'
 		for category in $value; do
@@ -558,15 +537,15 @@ find_entry() {
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
-		# ensure entry is a Terminal Emulator when using stock applications
-		check_bool "${XTE_STOCK_TERMINALS-true}" && [ -z "${TERMINAL-}" ] && continue
+		# ensure entry is a Terminal Emulator
+		[ -z "${TERMINAL-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop
 		return 0
 	done
 	# shellcheck disable=SC2086
-	IFS=':' error "No valid terminal entry was found in:" ${DATA_DIRECTORIES}
+	IFS=':' error "No valid terminal entry was found in:" ${APPLICATIONS_DIRS}
 	return 1
 }
 # Mask IFS withing function to allow temporary changes
@@ -576,7 +555,7 @@ alias find_entry='IFS= find_entry'
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
 
 # this will receive proper value later
-DATA_DIRECTORIES=''
+APPLICATIONS_DIRS=''
 
 # path iterators
 make_paths
@@ -619,6 +598,13 @@ fi
 
 # Store original argument list, before it's modified
 debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
+
+# drop -e or custom ExecArg if given as the first arg
+case "${1-}" in
+'-e' | "$EXECARG")
+	debug "dropping '$1' from received args"
+	shift ;;
+esac
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
 if [ "$#" -gt 0 ]; then
