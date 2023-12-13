@@ -45,23 +45,23 @@ else
 	debug() { :; }
 fi
 
+# Populates global constants and lists for later use and iteration
 make_paths() {
-	# generates iterators for all possible paths
 	IFS=':'
 
-	# config files
+	# Populate list of config files to read, in descending order of preference
 	for dir in ${XDG_CONFIG_HOME:-"${HOME}/.config"}${IFS}${XDG_CONFIG_DIRS:-/etc/xdg}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
 		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
-			CONFIGS=${CONFIGS-}${CONFIGS:+:}${dir%/}/${desktop}-xdg-terminals.list
+			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/${desktop}-xdg-terminals.list
 		done
-		CONFIGS=${CONFIGS-}${CONFIGS:+:}${dir%/}/xdg-terminals.list
+		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminals.list
 	done
 
-	# data dirs
+	# Populate list of directories to search for entries in, in ascending order of preference
 	for dir in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
-		APPLICATIONS_DIRS=${APPLICATIONS_DIRS-}${APPLICATIONS_DIRS:+:}${dir%/}/applications/
+		APPLICATIONS_DIRS=${dir%/}/applications/${APPLICATIONS_DIRS:+${IFS}${APPLICATIONS_DIRS}}
 	done
 
 	# cache
@@ -272,23 +272,19 @@ find_entry_paths() {
 		# Loop through entry paths and IDs
 		IFS="$N"
 		while read -r entry_path && read -r entry_id; do
-			# since we are moving up the XDG heirarchy, the first encoutered path for entry ID is used
-			if alias "$entry_id" > /dev/null 2>&1; then
-				debug "skipped '$entry_path' as '$entry_id' (overridden earlier)"
-			else
-				# shellcheck disable=SC2139
-				alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1
-				debug "registered '$entry_path' as entry '$entry_id'"
-				# Add as a fallback ID regardles if it's a duplicate
-				FALLBACK_ENTRY_IDS=${FALLBACK_ENTRY_IDS:+${FALLBACK_ENTRY_IDS}${N}}$entry_id
-				debug "added fallback ID '$entry_id'"
-			fi
+			# Entries are checked in ascending order of preference, so use last found if duplicate
+			# shellcheck disable=SC2139
+			alias "$entry_id"="entry_path='$entry_path'" > /dev/null 2>&1
+			debug "registered '$entry_path' as entry '$entry_id'"
+			# Add as a fallback ID regardles if it's a duplicate
+			FALLBACK_ENTRY_IDS=${entry_id}${FALLBACK_ENTRY_IDS:+${N}${FALLBACK_ENTRY_IDS}}
+			debug "added fallback ID '$entry_id'"
 		done <<- //
 			$(
 				# Find all desktop entries with valid names
 				find -L "$directory" -type f -name '[a-zA-Z0-9_]*.desktop' ! -path '*[^a-zA-Z0-9_./-]*' |
 					# Print order of found files is unpredictable, sort them
-					sort |
+					sort -r |
 					# Print entry path and convert it into an ID and print that too
 					awk '{ print; $0=substr($0, '${#directory}' + 1); gsub("/", "-"); print }'
 			)
