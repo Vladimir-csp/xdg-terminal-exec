@@ -141,7 +141,7 @@ read_cache() {
 				return 1
 			fi
 		else
-			debug "invlaid cache data"
+			debug "invalid cache data"
 			return 1
 		fi
 	else
