@@ -184,46 +184,39 @@ read_config_paths() {
 		debug "reading config '$config_path'"
 		# Nonexistant file is not an error
 		[ -f "$config_path" ] || continue
-		# Let `read` trim leading/trailing whitespace from the line
-		while IFS="$OIFS" read -r line; do
-			#debug "read line '$line'"
-			case $line in
-
-			# Catch directives first
-
-			# cache control
-			/enable_cache)
-				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
+		# Let `read` trim leading/trailing whitespace from the IDs
+		while IFS=":$OIFS" read -r entry_id action_id; do
+			# Keep track of linenumber for error messages
+			linenum=$((linenum += 1))
+			# Rejoin the line for easier checks
+			case "$entry_id:$action_id" in
+			# Directives to toggle cache
+			'/enable_cache:')
+				debug "found '$entry_id' directive${XTE_CACHE_ENABLED+ (ignored)}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
 				;;
-			/disable_cache)
-				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
+			'/disable_cache:')
+				debug "found '$entry_id' directive${XTE_CACHE_ENABLED+ (ignored)}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
-
-			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
-			# `a sequence of non-empty elements separated by dots (U+002E FULL STOP),
-			# none of which starts with a digit, and each of which contains only characters from the set [a-zA-Z0-9-_]`
-			# Stricter parts seem to be related only to reversed DNS notation but not common naming
-			# i.e. there is `2048-qt.desktop`.
-			# I do not know of any terminal that starts with a number, but it's valid.
-
-			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
-			[a-zA-Z0-9_]*)
-				# consider only the first ':' as a delimiter
-				IFS=':' read -r entry_id action_id <<- EOL
-					$line
-				EOL
-				if validate_entry_id "${entry_id}" && validate_action_id "${action_id}"; then
-					ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
-					debug "added entry ID with action ID '$line'"
-				else
-					error "Discarded possibly misspelled entry '$line'"
-				fi
+			# Ignore comments and empty lines
+			'#'* | ':') ;;
+			# Sorry for the liberal paraphrasing
+			# `[The extensionless entry filename comprises of dot separated elements] each of which contains only [...] [A-Za-z0-9-_]`
+			# Catch and warn on invalid IDs
+			*[![:alnum:]_.-]*'.desktop:'* | *'.desktop:'*[![:alnum:]_.-]* | '.desktop:'*)
+				error "$config_path: line $linenum: discarded invalid entry"
 				;;
-
+			# Catch valid entry ID
+			[[:alnum:]_]*'.desktop:'*)
+				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id:$action_id
+				debug "added entry ID with action ID '$entry_id:$action_id'"
+				;;
+			# Catch and complain on invalid lines
+			*)
+				debug "line $linenum: discarded invalid line"
+				;;
 			esac
-			# By default empty lines and comments get ignored
 		done < "$config_path"
 	done
 }
