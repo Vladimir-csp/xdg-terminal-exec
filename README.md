@@ -54,6 +54,7 @@ Where `${desktop}` is a lowercased string that can be matched (case-insensitivel
   - presense of `TerminalEmulator` category if using stock `applications` data subdirs
   - validation by the same rules as in Desktop Entry Spec, now including `*ShowIn` conditions
   - the first applicable entry is used
+    - the order in which found entries under the same base directory are checked in is undefined
 - If no applicable entry is found, an error is returned.
 
 ## Desktop entry for a terminal
