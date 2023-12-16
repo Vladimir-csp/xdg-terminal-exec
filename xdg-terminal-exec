@@ -438,41 +438,6 @@ read_entry_path() {
 	done < "$entry_path"
 }
 
-validate_entry_id() {
-	# validates entry ID ($1)
-
-	case "$1" in
-	# invalid characters or degrees of emptiness
-	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
-		debug "string not valid as Entry ID: '$1'"
-		return 1
-		;;
-	# all that left with .desktop
-	*.desktop) return 0 ;;
-	# and without
-	*)
-		debug "string not valid as Entry ID '$1'"
-		return 1
-		;;
-	esac
-}
-
-validate_action_id() {
-	# validates action ID ($1)
-
-	case "$1" in
-	# empty is ok
-	'') return 0 ;;
-	# invalid characters
-	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
-		debug "string not valid as Action ID: '$1'"
-		return 1
-		;;
-	# all that left
-	*) return 0 ;;
-	esac
-}
-
 # Loop through IDs and try to find a valid entry
 find_entry() {
 	# for explicitly listed entries do not apply DE *ShowIn limits
