@@ -477,48 +477,37 @@ validate_action_id() {
 find_entry() {
 	# for explicitly listed entries do not apply DE *ShowIn limits
 	de_checks=false
-	IFS="$N"
-	for entry_id in ${ENTRY_IDS}${N}//fallback_start//${N}$FALLBACK_ENTRY_IDS; do
-		case "$entry_id" in
-		# entry has an action appended
-		*:*)
-			entry_action=${entry_id#*:}
-			entry_id=${entry_id%:*}
-			;;
-		# skip empty line
-		'') continue ;;
+	while IFS=':' read -r entry_id entry_action; do
 		# fallback entries ahead, enable *ShowIn checks
-		'//fallback_start//')
+		if [ "$entry_id" = '//fallback_start//' ]; then
 			de_checks=true
 			continue
-			;;
-		# nullify action
-		*) entry_action='' ;;
-		esac
-
+		fi
 		debug "matching path for entry ID '$entry_id'"
 		# Check if a matching path was found for ID
 		alias "$entry_id" > /dev/null 2>&1 || continue
-		# Evaluates the alias, it sets $entry_path
+		# Evaluate the alias, it sets $entry_path
 		eval "$entry_id"
 		# Unset the alias, so duplicate entries are skipped
 		unalias "$entry_id"
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
-		# Check that the entry is actually executable
-		[ -z "${EXEC-}" ] && continue
-		# ensure entry is a Terminal Emulator
+		# Check that the entry is a Terminal Emulator
 		[ -z "${TERMINAL-}" ] && continue
+		# Check that the entry is executable
+		[ -z "${EXEC-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop
 		return 0
-	done
+	done <<- EOE
+		$ENTRY_IDS
+		//fallback_start//
+		$FALLBACK_ENTRY_IDS
+	EOE
 	# shellcheck disable=SC2086
 	IFS=':' error "No valid terminal entry was found in:" ${APPLICATIONS_DIRS}
 	return 1
 }
-# Mask IFS withing function to allow temporary changes
-alias find_entry='IFS= find_entry'
 
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
