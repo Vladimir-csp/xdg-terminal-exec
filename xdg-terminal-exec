@@ -296,18 +296,18 @@ alias find_entry_paths='IFS= find_entry_paths'
 check_entry_key() {
 	key="$1"
 	value="$2"
-	entry_action="$3"
+	action_id="$3"
 
 	case $key in
 	'X-ExecArg' | 'ExecArg') check_entry_execarg "$value" ;;
 	'Categories') check_entry_categories "$value" ;;
 	'OnlyShowIn') check_entry_onlyshowin "$value" ;;
 	'NotShowIn') check_entry_notshowin "$value" ;;
-	'Actions') check_entry_actions "$value" "$entry_action" ;;
+	'Actions') check_entry_actions "$value" "$action_id" ;;
 	'TryExec') check_entry_tryexec "$value" ;;
 	'Hidden') check_entry_hidden "$value" ;;
 	# Only read key from requested action group, marked by unset ID
-	'Exec') [ -z "$entry_action" ] && check_entry_exec "$value" ;;
+	'Exec') [ -z "$action_id" ] && check_entry_exec "$value" ;;
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
 }
@@ -402,9 +402,9 @@ check_entry_exec() {
 # Read entry from given path
 read_entry_path() {
 	entry_path="$1"
-	entry_action="$2"
+	action_id="$2"
 
-	debug "reading desktop entry '$entry_path' ${entry_action:+"action '$entry_action'"}"
+	debug "reading desktop entry '$entry_path' ${action_id:+"action '$action_id'"}"
 	# Let `read` trim leading/trailing spaces from the key and value
 	while IFS="= " read -r key value; do
 		# Rejoin the line for easier checks
@@ -412,13 +412,13 @@ read_entry_path() {
 		# Consume the main entry group
 		'[Desktop Entry]') ;;
 		# Consume given action group
-		"[Desktop Action ${entry_action-}]") unset entry_action ;;
+		"[Desktop Action ${action_id-}]") unset action_id ;;
 		# Start of the next group header, stop if action has been consumed
-		'['*) [ -z "${entry_action-}" ] && break ;;
+		'['*) [ -z "${action_id-}" ] && break ;;
 		# A `Key=Value` pair
 		[a-zA-Z0-9-]*)
 			# Check the pair and continue if valid
-			check_entry_key "$key" "$value" "${entry_action-}" && continue
+			check_entry_key "$key" "$value" "${action_id-}" && continue
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
@@ -436,7 +436,7 @@ find_entry() {
 	# Do not enforce *ShowIn checks with explicitly listed entries
 	alias check_entry_onlyshowin=':'
 	alias check_entry_notshowin=':'
-	while IFS=':' read -r entry_id entry_action; do
+	while IFS=':' read -r entry_id action_id; do
 		# Rest are fallback entries, enable *ShowIn checks
 		if [ "$entry_id" = '//fallback_start//' ]; then
 			unalias check_entry_onlyshowin
@@ -450,7 +450,7 @@ find_entry() {
 		eval "$entry_id"
 		# Unset the alias, so duplicate entries are skipped
 		unalias "$entry_id"
-		read_entry_path "$entry_path" "$entry_action" || continue
+		read_entry_path "$entry_path" "$action_id" || continue
 		# Check that the entry is a Terminal Emulator
 		[ -z "${TERMINAL-}" ] && continue
 		# Check that the entry is executable
