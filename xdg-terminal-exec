@@ -25,7 +25,7 @@ N='
 '
 
 # Utility function to print messages to stderr
-error() { printf '%s\n' "$@" >&2; }
+error() { printf 'ERROR: %s\n' "$@" >&2; }
 
 check_bool() {
 	case "$1" in
@@ -40,7 +40,8 @@ check_bool() {
 
 # Utility function to print debug messages to stderr (or not)
 if check_bool "${DEBUG-0}"; then
-	debug() { printf 'D: %s\n' "$@" >&2; }
+	# Expand <tab> in debug messages to tab stop (long enough for most entry IDs)
+	debug() { printf '%s\n' "$@" | expand -t 64 >&2; }
 else
 	debug() { :; }
 fi
@@ -68,7 +69,7 @@ make_paths() {
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
 	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
 
-	debug "paths:" "CONFIGS=${CONFIGS}" "APPLICATIONS_DIRS=${APPLICATIONS_DIRS}"
+	debug "CONFIG:	$CONFIGS" "APPLICATIONS_DIRS:	$APPLICATIONS_DIRS" ''
 }
 # Mask IFS withing function to allow temporary changes
 alias make_paths='IFS= make_paths'
@@ -177,13 +178,14 @@ save_cache() {
 
 # Parse all config files and populate $READ_ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
+	debug '' '    > reading terminal list files:'
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
 	IFS=':'
 	for config_path in ${CONFIGS}; do
-		debug "reading config '$config_path'"
 		# Nonexistant file is not an error
 		[ -f "$config_path" ] || continue
+		debug '' "    $config_path"
 		# Let `read` trim leading/trailing whitespace from the IDs
 		while IFS=":$OIFS" read -r entry_id action_id; do
 			# Keep track of linenumber for error messages
@@ -192,11 +194,11 @@ read_config_paths() {
 			case "$entry_id:$action_id" in
 			# Directives to toggle cache
 			'/enable_cache:')
-				debug "found '$entry_id' directive${XTE_CACHE_ENABLED+ (ignored)}"
+				debug "directive	$entry_id ${XTE_CACHE_ENABLED+'(ignored)'}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
 				;;
 			'/disable_cache:')
-				debug "found '$entry_id' directive${XTE_CACHE_ENABLED+ (ignored)}"
+				debug "directive	$entry_id ${XTE_CACHE_ENABLED+'(ignored)'}"
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
 			# Ignore comments and empty lines
@@ -210,7 +212,7 @@ read_config_paths() {
 			# Catch valid entry ID
 			[[:alnum:]_]*'.desktop:'*)
 				READ_ENTRY_IDS=${READ_ENTRY_IDS:+${READ_ENTRY_IDS}${N}}$entry_id:$action_id
-				debug "added entry ID with action ID '$entry_id:$action_id'"
+				debug "$entry_id	: $action_id"
 				;;
 			# Catch and complain on invalid lines
 			*)
@@ -255,7 +257,6 @@ replace() {
 
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
-	debug "registering entries"
 	# Append application directory paths to be searched
 	IFS=':'
 	for directory in $APPLICATIONS_DIRS; do
@@ -266,16 +267,16 @@ find_entry_paths() {
 	# Find all desktop entries with valid names
 	set -- "$@" -type f -name '[a-zA-Z0-9_]*.desktop' ! -path '*[^a-zA-Z0-9_./-]*'
 
+	debug '' '    > mapping entry IDs to paths:'
 	# Loop through found entry paths and IDs
 	IFS=$N
 	while read -r entry_path && read -r entry_id; do
 		# Entries are checked in ascending order of preference, so use last found if duplicate
 		# shellcheck disable=SC2139
 		alias "$entry_id"="entry_path='$entry_path'"
-		debug "registered '$entry_path' as entry '$entry_id'"
+		debug "$entry_id	-> $entry_path"
 		# Prepend to list of found IDs
 		FOUND_ENTRY_IDS=${entry_id}${FOUND_ENTRY_IDS:+${N}${FOUND_ENTRY_IDS}}
-		debug "added found ID '$entry_id'"
 	done <<- EOE
 		$(
 			# Don't complain about nonexistent directories
@@ -284,6 +285,8 @@ find_entry_paths() {
 				awk '{ print; sub(".*/[.]/", ""); gsub("/", "-"); print }'
 		)
 	EOE
+
+	debug '' '    > final list of found entry IDs:' ${FOUND_ENTRY_IDS:+"$FOUND_ENTRY_IDS"} ''
 }
 # Mask IFS withing function to allow temporary changes
 alias find_entry_paths='IFS= find_entry_paths'
@@ -320,7 +323,7 @@ alias check_entry_key='IFS= check_entry_key'
 # Function `check_entry` is responsible for masking IFS etc. for them when called
 
 check_entry_categories() {
-	debug "checking for 'TerminalEmulator' in Categories '$1'"
+	debug "Categories	'$1'"
 	IFS=';'
 	for category in $1; do
 		if [ "$category" = "TerminalEmulator" ]; then
@@ -333,7 +336,7 @@ check_entry_categories() {
 }
 
 check_entry_onlyshowin() {
-	debug "checking for intersecion between '${XDG_CURRENT_DESKTOP-}' and OnlyShowIn '$1'"
+	debug "OnlyShowIn	'${XDG_CURRENT_DESKTOP-}' <-> '$1'"
 	IFS=';'
 	for target in $1; do
 		IFS=':'
@@ -346,12 +349,11 @@ check_entry_onlyshowin() {
 }
 
 check_entry_notshowin() {
-	debug "checking for intersecion between '${XDG_CURRENT_DESKTOP-}' and NotShowIn '$1'"
+	debug "NotShowIn	'${XDG_CURRENT_DESKTOP-}' <-> '$1'"
 	IFS=';'
 	for target in $1; do
 		IFS=':'
 		for desktop in ${XDG_CURRENT_DESKTOP-}; do
-			debug "checking NotShowIn match '$desktop'='$target'"
 			[ "$desktop" = "$target" ] && return 1
 		done
 	done
@@ -360,7 +362,7 @@ check_entry_notshowin() {
 }
 
 check_entry_execarg() {
-	debug "read ExecArg '$1'"
+	debug "ExecArg	'$1'"
 	# Set global variable
 	EXECARG=$1
 }
@@ -368,34 +370,32 @@ check_entry_execarg() {
 check_entry_actions() {
 	# Ignore if no action ID was given
 	[ -z "$2" ] && return 0
-	debug "checking for '$2' in Actions '$1'"
-	# `[Action groups not mentioned in the Actions key] must be ignored by implementors.`
+	debug "Actions	'$1' <-> '$2'"
 	IFS=';'
 	for action in $1; do
 		[ "$action" = "$2" ] && return 0
 	done
-	# Default in this case is to fail
+	# `[Action groups not mentioned in the Actions key] must be ignored by implementors.`
 	return 1
 }
 
 check_entry_tryexec() {
-	debug "checking TryExec executable '$1'"
+	debug "TryExec	'$1'"
 	command -v "$1" > /dev/null || return 1
 }
 
 check_entry_hidden() {
-	debug "checking boolean Hidden '$1'"
+	debug "Hidden	'$1'"
 	[ "$1" = 'true' ] && return 1
 }
 
 check_entry_exec() {
-	debug "read Exec '$1'"
+	debug "Exec	'$1'"
 	# Set global variable
 	EXEC=$1
 	# Get first word from read Exec value
 	IFS="$OIFS"
 	eval "set -- $EXEC"
-	debug "checking Exec[0] executable '$1'"
 	command -v "$1" > /dev/null || return 1
 }
 
@@ -404,7 +404,7 @@ read_entry_path() {
 	entry_path="$1"
 	action_id="$2"
 
-	debug "reading desktop entry '$entry_path' ${action_id:+"action '$action_id'"}"
+	debug "    -> $entry_path"
 	# Let `read` trim leading/trailing spaces from the key and value
 	while IFS="= " read -r key value; do
 		# Rejoin the line for easier checks
@@ -423,7 +423,6 @@ read_entry_path() {
 			unset EXEC
 			unset EXECARG
 			unset TERMINAL
-			debug "entry discarded"
 			return 1
 			;;
 		esac
@@ -433,6 +432,8 @@ read_entry_path() {
 
 # Loop through IDs and try to find a valid entry
 find_entry() {
+	debug '' '    > checking entries:'
+
 	# Do not enforce *ShowIn checks with explicitly listed entries
 	alias check_entry_onlyshowin=':'
 	alias check_entry_notshowin=':'
@@ -443,7 +444,7 @@ find_entry() {
 			unalias check_entry_notshowin
 			continue
 		fi
-		debug "matching path for entry ID '$entry_id'"
+		debug '' "$entry_id	${action_id:+": $action_id"}"
 		# Check if a matching path was found for ID
 		alias "$entry_id" > /dev/null 2>&1 || continue
 		# Evaluate the alias, it sets $entry_path
@@ -458,14 +459,14 @@ find_entry() {
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop
+		debug '    ^ entry valid' '' "    EXEC=$EXEC" "    EXECARG=$EXECARG" ''
 		return 0
 	done <<- EOE
 		$READ_ENTRY_IDS
 		//fallback_start//
 		$FOUND_ENTRY_IDS
 	EOE
-	# shellcheck disable=SC2086
-	IFS=':' error "No valid terminal entry was found in:" ${APPLICATIONS_DIRS}
+	debug '' 'exhausted list of entry IDs' ''
 	return 1
 }
 
@@ -503,21 +504,22 @@ else
 	# Modifies $FOUND_ENTRY_IDS and sets global aliases
 	find_entry_paths
 
-	debug '>    final read entry ID list:' ${READ_ENTRY_IDS:+"$READ_ENTRY_IDS"} '^    end of ID list'
-	debug '>    final found entry ID list:' ${FOUND_ENTRY_IDS:+"$FOUND_ENTRY_IDS"} '^    end of ID list'
-
 	# walk ID lists and find first applicable
-	find_entry || exit 1
+	if ! find_entry; then
+		error 'No valid entry was found'
+		exit 1
+	fi
 fi
 
-# Store original argument list, before it's modified
-debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
+# Print original argument list, before it's modified
+debug '' '    > given ARGV list:' "$@" ''
 
 # drop -e or custom ExecArg if given as the first arg
 case "${1-}" in
 '-e' | "$EXECARG")
-	debug "dropping '$1' from received args"
-	shift ;;
+	debug "dropped '$1' from list"
+	shift
+	;;
 esac
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
@@ -527,7 +529,7 @@ else
 	eval "set -- $EXEC"
 fi
 
-debug ">     final args:" "$@" "^     end of final args"
+debug '' '    > final ARGV list:' "$@" ''
 
 if [ "$CACHE_USED" = "false" ]; then
 	# saves or removes cache, forked out of the way
