@@ -175,7 +175,7 @@ save_cache() {
 	fi
 }
 
-# Parse all config files and populate $ENTRY_IDS with read desktop entry IDs
+# Parse all config files and populate $READ_ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
@@ -209,7 +209,7 @@ read_config_paths() {
 				;;
 			# Catch valid entry ID
 			[[:alnum:]_]*'.desktop:'*)
-				ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$entry_id:$action_id
+				READ_ENTRY_IDS=${READ_ENTRY_IDS:+${READ_ENTRY_IDS}${N}}$entry_id:$action_id
 				debug "added entry ID with action ID '$entry_id:$action_id'"
 				;;
 			# Catch and complain on invalid lines
@@ -273,9 +273,9 @@ find_entry_paths() {
 		# shellcheck disable=SC2139
 		alias "$entry_id"="entry_path='$entry_path'"
 		debug "registered '$entry_path' as entry '$entry_id'"
-		# Add as a fallback ID regardles if it's a duplicate
-		FALLBACK_ENTRY_IDS=${entry_id}${FALLBACK_ENTRY_IDS:+${N}${FALLBACK_ENTRY_IDS}}
-		debug "added fallback ID '$entry_id'"
+		# Prepend to list of found IDs
+		FOUND_ENTRY_IDS=${entry_id}${FOUND_ENTRY_IDS:+${N}${FOUND_ENTRY_IDS}}
+		debug "added found ID '$entry_id'"
 	done <<- EOE
 		$(
 			# Don't complain about nonexistent directories
@@ -437,7 +437,7 @@ find_entry() {
 	alias check_entry_onlyshowin=':'
 	alias check_entry_notshowin=':'
 	while IFS=':' read -r entry_id action_id; do
-		# Rest are fallback entries, enable *ShowIn checks
+		# Fallback to all found unchecked entries, enable *ShowIn checks
 		if [ "$entry_id" = '//fallback_start//' ]; then
 			unalias check_entry_onlyshowin
 			unalias check_entry_notshowin
@@ -460,9 +460,9 @@ find_entry() {
 		# Entry is valid, stop
 		return 0
 	done <<- EOE
-		$ENTRY_IDS
+		$READ_ENTRY_IDS
 		//fallback_start//
-		$FALLBACK_ENTRY_IDS
+		$FOUND_ENTRY_IDS
 	EOE
 	# shellcheck disable=SC2086
 	IFS=':' error "No valid terminal entry was found in:" ${APPLICATIONS_DIRS}
@@ -493,22 +493,18 @@ else
 	# continue with globals
 	CACHE_USED=false
 
-	# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
-	# with duplicates removed
-	ENTRY_IDS=''
-	# All desktop entry ids found in data dirs in descending order of preference,
-	# with duplicates (including those in $ENTRY_IDS) removed
-	FALLBACK_ENTRY_IDS=''
+	# All desktop entry IDs read from *xdg-terminals.list files, in descending order of preference
+	READ_ENTRY_IDS=''
+	# All desktop entry IDs found in application directories, in descending order of preference
+	FOUND_ENTRY_IDS=''
 
-	# Modifies $ENTRY_IDS
+	# Modifies $READ_ENTRY_IDS
 	read_config_paths
-	# Modifies $ENTRY_IDS and sets global aliases
+	# Modifies $FOUND_ENTRY_IDS and sets global aliases
 	find_entry_paths
 
-	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
-	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
+	debug '>    final read entry ID list:' ${READ_ENTRY_IDS:+"$READ_ENTRY_IDS"} '^    end of ID list'
+	debug '>    final found entry ID list:' ${FOUND_ENTRY_IDS:+"$FOUND_ENTRY_IDS"} '^    end of ID list'
 
 	# walk ID lists and find first applicable
 	find_entry || exit 1
