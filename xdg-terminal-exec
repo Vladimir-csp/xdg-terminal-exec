@@ -263,6 +263,7 @@ replace() {
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
 	debug "registering entries"
+
 	# Append application directory paths to be searched
 	IFS=':'
 	for directory in $APPLICATIONS_DIRS; do
@@ -270,8 +271,17 @@ find_entry_paths() {
 		set -- "$@" "$directory".
 	done
 
-	# Find all desktop entries with valid names
-	set -- "$@" -type f -name '[a-zA-Z0-9_]*.desktop' ! -path '*[^a-zA-Z0-9_./-]*'
+	# Find all files
+	set -- "$@" -type f
+
+	# Append path conditions per directory
+	or_arg=''
+	for directory in $APPLICATIONS_DIRS; do
+		# Match full path with proper first character of entry ID and .desktop extension
+		# Reject paths with invalid characters in entry ID
+		set -- "$@" ${or_arg} '(' -path "$directory"'./[a-zA-Z0-9_]*.desktop' ! -path "$directory"'./*[^a-zA-Z0-9_./-]*' ')'
+		or_arg='-o'
+	done
 
 	# Loop through found entry paths and IDs
 	IFS=$N
@@ -579,7 +589,8 @@ debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXE
 case "${1-}" in
 '-e' | "$EXECARG")
 	debug "dropping '$1' from received args"
-	shift ;;
+	shift
+	;;
 esac
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
