@@ -309,7 +309,7 @@ alias find_entry_paths='IFS= find_entry_paths'
 # Modifies following global variables:
 # EXEC : Program to execute, possibly with arguments. See spec for details.
 # EXECARG : Execution argument for the terminal emulator.
-# TERMINAL : Set if application has been categorized as a terminal emulator
+# IS_TERMINAL : Set if application has been categorized as a terminal emulator
 check_entry_key() {
 	key="$1"
 	value="$2"
@@ -324,7 +324,7 @@ check_entry_key() {
 		IFS=';'
 		for category in $value; do
 			[ "$category" = "TerminalEmulator" ] && {
-				TERMINAL=true
+				IS_TERMINAL=true
 				return 0
 			}
 		done
@@ -441,7 +441,7 @@ read_entry_path() {
 			# Reset values that might have been set
 			unset EXEC
 			unset EXECARG
-			unset TERMINAL
+			unset IS_TERMINAL
 			# shellcheck disable=SC2016
 			debug "entry discarded"
 			return 1
@@ -524,7 +524,7 @@ find_entry() {
 		# Check that the entry is actually executable
 		[ -z "${EXEC-}" ] && continue
 		# ensure entry is a Terminal Emulator
-		[ -z "${TERMINAL-}" ] && continue
+		[ -z "${IS_TERMINAL-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
 		# Entry is valid, stop
@@ -542,6 +542,11 @@ LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' 
 
 # this will receive proper value later
 APPLICATIONS_DIRS=''
+
+# init vars used in iterations
+IS_TERMINAL=''
+EXEC=''
+EXECARG='-e'
 
 # path iterators
 make_paths
