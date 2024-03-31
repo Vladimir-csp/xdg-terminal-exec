@@ -392,7 +392,12 @@ check_entry_key() {
 		;;
 	'Hidden'*=*)
 		debug "checking boolean Hidden '$value'"
-		[ "$value" = 'true' ] && return 1
+		case "$value" in
+		true)
+			debug "ignored Hidden entry"
+			return 1
+			;;
+		esac
 		;;
 	'Exec'*=*)
 		case "$read_exec" in
