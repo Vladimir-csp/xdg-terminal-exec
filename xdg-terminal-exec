@@ -153,25 +153,11 @@ read_cache() {
 alias read_cache='IFS= read_cache'
 
 save_cache() {
-	# saves $HASH, $EXEC, $EXECARG, $1 (executable) to cache file or removes it if CACHE_ENABLE is false
-	if check_bool "$CACHE_ENABLED"; then
-		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
-		if [ -z "${HASH-}" ]; then
-			HASH=$(gen_hash) || {
-				echo "could not hash listing, removing '${CACHE_FILE}'" >&2
-				rm -f "${CACHE_FILE}"
-				return 0
-			}
-		fi
-		UM=$(umask)
+	if check_bool "${XTE_CACHE_ENABLED-true}"; then
+		# No need to restore umask, as this is the only file touched, and the value doesn't propagate to the parent process
 		umask 0077
-		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" "${1}" > "${CACHE_FILE}"
-		umask "$UM"
-		debug ">     saved cache:" "${HASH}" "${EXEC}" "${EXECARG}" "${1}" "^     end of saved cache"
-	else
-		debug "cache is disabled, removing '${CACHE_FILE}'"
-		rm -f "${CACHE_FILE}"
-		return 0
+		printf '%s\n' "cached_path='$1'" "cached_desktop='${XDG_CURRENT_DESKTOP-}'" "cached_ids='$ENTRY_IDS'" > "$CACHE_FILE"
+		debug "saved cache"
 	fi
 }
 
@@ -194,11 +180,11 @@ read_config_paths() {
 			# cache control
 			/enable_cache)
 				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
-				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
+				XTE_CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
 				;;
 			/disable_cache)
 				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
-				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
+				XTE_CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
 
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
@@ -226,6 +212,9 @@ read_config_paths() {
 			# By default empty lines and comments get ignored
 		done < "$config_path"
 	done
+
+	# shellcheck disable=SC2086
+	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
 }
 # Mask IFS withing function to allow temporary changes
 alias read_config_paths='IFS= read_config_paths'
@@ -301,6 +290,9 @@ find_entry_paths() {
 				awk '{ print; sub(".*/[.]/", ""); gsub("/", "-"); print }'
 		)
 	EOE
+
+	# shellcheck disable=SC2086
+	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
 }
 # Mask IFS withing function to allow temporary changes
 alias find_entry_paths='IFS= find_entry_paths'
@@ -497,6 +489,13 @@ validate_action_id() {
 
 # Loop through IDs and try to find a valid entry
 find_entry() {
+	# All desktop entry ids found in data dirs in descending order of preference,
+	# with duplicates (including those in $ENTRY_IDS) removed
+	FALLBACK_ENTRY_IDS=''
+
+	# Modifies $ENTRY_IDS and sets global aliases
+	find_entry_paths
+
 	# for explicitly listed entries do not apply DE *ShowIn limits
 	de_checks=false
 	IFS="$N"
@@ -532,6 +531,8 @@ find_entry() {
 		[ -z "${IS_TERMINAL-}" ] && continue
 		# Set defaults
 		: "${EXECARG="-e"}"
+		# Save cache
+		save_cache "$entry_path"
 		# Entry is valid, stop
 		return 0
 	done
@@ -541,6 +542,24 @@ find_entry() {
 }
 # Mask IFS withing function to allow temporary changes
 alias find_entry='IFS= find_entry'
+
+find_cached_entry() {
+	check_bool "${XTE_CACHE_ENABLED-false}" || return 1
+	[ -r "$CACHE_FILE" ] || return 1
+	. "$CACHE_FILE"
+
+	debug "$cached_ids" "$cached_path" "$cached_desktop"
+
+	[ "$cached_ids" = "$ENTRY_IDS" ] || return 1
+	[ "$cached_desktop" = "${XDG_CURRENT_DESKTOP-}" ] || return 1
+	[ -r "$cached_path" ] || return 1
+
+	debug "yay, cache"
+
+	find() { command find "$@" '(' -newer "$CACHE_FILE" -o -path "$cached_path" ')'; }
+
+	find_entry || unset -f find && return 1
+}
 
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
@@ -556,41 +575,15 @@ EXECARG='-e'
 # path iterators
 make_paths
 
-# At this point we have no way of telling if cache is enabled or not, unless XTE_CACHE_ENABLED is set,
-# so just try reading it as if default is true, otherwise do the usual thing.
-# Editing config to disable cache should invalidate the cache.
-# The true default is false though:
-CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
+# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
+# with duplicates removed
+ENTRY_IDS=''
 
-# HASH can be reused
-HASH=''
+# Modifies $ENTRY_IDS
+read_config_paths
 
-if check_bool "${XTE_CACHE_ENABLED-true}" && read_cache; then
-	CACHE_USED=true
-else
-	# continue with globals
-	CACHE_USED=false
-
-	# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
-	# with duplicates removed
-	ENTRY_IDS=''
-	# All desktop entry ids found in data dirs in descending order of preference,
-	# with duplicates (including those in $ENTRY_IDS) removed
-	FALLBACK_ENTRY_IDS=''
-
-	# Modifies $ENTRY_IDS
-	read_config_paths
-	# Modifies $ENTRY_IDS and sets global aliases
-	find_entry_paths
-
-	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
-	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
-
-	# walk ID lists and find first applicable
-	find_entry || exit 1
-fi
+# walk ID lists and find first applicable
+find_cached_entry || find_entry || exit 1
 
 # Store original argument list, before it's modified
 debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
@@ -611,10 +604,5 @@ else
 fi
 
 debug ">     final args:" "$@" "^     end of final args"
-
-if [ "$CACHE_USED" = "false" ]; then
-	# saves or removes cache, forked out of the way
-	save_cache "$1" &
-fi
 
 exec "$@"
