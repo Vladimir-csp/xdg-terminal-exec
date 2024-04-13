@@ -1,7 +1,8 @@
 # xdg-terminal-exec
 
 Proposal for XDG Default Terminal Execution Specification and reference
-shell-based implementation.
+shell-based implementation. The proposal PR can be found
+[here](https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3/diffs).
 
 # Default Terminal Execution Specification
 
