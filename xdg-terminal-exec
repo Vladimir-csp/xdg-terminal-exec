@@ -1,8 +1,11 @@
 #!/bin/sh
-# Proposal for XDG terminal execution utility
+# Default Terminal Execution Utility
+# Reference implementation of proposed Default Terminal Execution Specification
+# https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3
 #
 # by Vladimir Kudrya
 # https://github.com/Vladimir-csp/
+# https://gitlab.freedesktop.org/Vladimir-csp/
 #
 # This script is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by

@@ -1,9 +1,9 @@
 # xdg-terminal-exec
 
-Proposal for XDG terminal execution utility and default terminal specification.
-Reference shell-based implementation.
+Proposal for XDG Default Terminal Execution Specification and reference
+shell-based implementation.
 
-# Default Terminal Execution Spec and Utility
+# Default Terminal Execution Specification
 
 This configuration spec is crafted in image of
 [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html)
@@ -23,16 +23,19 @@ Optionally an entry ID can be suffixed with
 [action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html),
 delimited by `:` (`entry-id.desktop:action-id`).
 
-Lines starting with `#` are ignored, dangling whitespaces are trimmed.
+Empty lines and lines starting with `#` are ignored, dangling whitespaces are
+trimmed.
 
 Special directives for modifying behavior of implementations may be present in
 config files. Directives that are not listed by this spec and are not understood
 by a particular implementation should be discarded.
 
-It is recommended to start directives with a symbol that is not valid for entry
-ID, i.e. `/`.
+Directives should not contain `.desktop` substring in them. And it is
+recommended to start directives with a symbol that is not valid for entry ID,
+i.e. `/`.
 
-Default paths used by utility are resolved into:
+Default paths for configuration and data are resolved into (in order of
+decreasing priority):
 
 - config files (in `${XDG_CONFIG_HOME}:${XDG_CONFIG_DIRS}`):
   - `${HOME}/.config/${desktop}-xdg-terminals.list`
@@ -46,7 +49,7 @@ Default paths used by utility are resolved into:
 
 Where `${desktop}` is a lowercased string that can be matched
 (case-insensitively) against items of `$XDG_CURRENT_DESKTOP` (a colon-separated
-list of names for the current DE).
+list of names for the current DE) in order of decreasing priority.
 
 ## Priority of selecting an entry
 
