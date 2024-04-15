@@ -81,8 +81,11 @@ list of names for the current DE) in order of decreasing priority.
 ## Desktop entry for a terminal
 
 Stock desktop entry for terminal emulator may be used. Command execution
-argument defaults to `-e`. Key `X-ExecArg=` can be used to override it or omit
-by explicitly setting to an empty value.
+argument defaults to `-e`. Key `ExecArg=` (`X-ExecArg=` while the spec is in
+proposed status) can be used to override it. If the terminal accepts commands
+without special argument, this key can be explicitly set to an empty value
+(execution argument will be omitted). Although in this case it is recommended to
+use `--` if the terminal handles it correctly.
 
 Whether launched terminal process waits for command to finish or exits
 immediately (i.e. after sending IPC request to a master process) is not defined
