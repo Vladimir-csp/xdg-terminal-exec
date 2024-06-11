@@ -61,16 +61,14 @@ list of names for the current DE) in order of decreasing priority.
       `$XDG_CURRENT_DESKTOP` items
     - from `xdg-terminals.list`
 - Each entry from the resulting list is checked for applicability:
-  - presense of `TerminalEmulator` category if using stock `applications` data
-    subdirs
+  - presense of `TerminalEmulator` category
   - validation by the same rules as in Desktop Entry Spec, except `*ShowIn`
     conditions
   - entry is discarded if it does not pass the checks
   - the first applicable entry is used
 - If no applicable entry is found, each entry from XDG data hierarchy (except
   those discarded earlier) is checked for applicability:
-  - presense of `TerminalEmulator` category if using stock `applications` data
-    subdirs
+  - presense of `TerminalEmulator` category
   - validation by the same rules as in Desktop Entry Spec, now including
     `*ShowIn` conditions
   - the first applicable entry is used
@@ -80,7 +78,7 @@ list of names for the current DE) in order of decreasing priority.
 
 ## Desktop entry for a terminal
 
-Stock desktop entry for terminal emulator may be used. Command execution
+Stock Desktop Entry for terminal emulator may be used. Command execution
 argument defaults to `-e`. Key `ExecArg=` (`X-ExecArg=` while the spec is in
 proposed status) can be used to override it. If the terminal accepts commands
 without special argument, this key can be explicitly set to an empty value
@@ -145,7 +143,7 @@ Setting `DEBUG` env to a truthy value will output verbose messages to stderr.
 The shell code itself is quite optimized and fast, especially when using a slick
 `sh` implementation like `dash`.
 
-The most taxing part of the algorithm is reading all the desktop entry files for
+The most taxing part of the algorithm is reading all the Desktop Entry files for
 parsing in search of an applicable terminal among them.
 
 Having a valid entry specified in `*xdg-terminals.list` speeds up the process
