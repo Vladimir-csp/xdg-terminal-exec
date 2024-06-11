@@ -63,7 +63,7 @@ directive is used):
 The cache feature allows storing selected terminal command line in
 _${XDG_CACHE_HOME}_ to bypass reading and parsing of configuration and Desktop
 Entries until changes are detected in the listing of Desktop Entry files
-or config files (disabled by default).
+or config files (enabled by default).
 
 # FILES
 

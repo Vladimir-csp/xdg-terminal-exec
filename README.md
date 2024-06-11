@@ -158,9 +158,9 @@ feeding `md5sum` the value of `$XDG_CURRENT_DESKTOP` and output of `ls -LRl` for
 all possible config file and data dir paths in one go. Valid cache bypasses
 reading of any other file.
 
-Currentry this feature is disabled by default and can be controlled by first
-encountered `/enable_cache`|`/disable_cache` direcive in the configs or
-`XTE_CACHE_ENABLED` env var (truthy or falsy value, has priority).
+This feature is enabled by default and can be controlled by first encountered
+`/enable_cache`|`/disable_cache` direcive in the configs or `XTE_CACHE_ENABLED`
+env var (truthy or falsy value, has priority).
 
 Unless `XTE_CACHE_ENABLED` is false, an attempt at reading the cache file is
 always performed though. Its existence translates into initial assumption about
@@ -174,5 +174,3 @@ and the var was later removed, the script will not know that the cache is
 disabled until one of three things happens: cache file is removed, something
 invalidates it (like touching/editing a config/entry), or a run with falsy
 `XTE_CACHE_ENABLED` is performed.
-
-The plan is to eventually enable it by default for unattended fastness.

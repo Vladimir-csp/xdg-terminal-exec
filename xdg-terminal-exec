@@ -563,7 +563,7 @@ make_paths
 # so just try reading it as if default is true, otherwise do the usual thing.
 # Editing config to disable cache should invalidate the cache.
 # The true default is false though:
-CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
+CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
 
 # HASH can be reused
 HASH=''
