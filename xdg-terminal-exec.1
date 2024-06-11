@@ -1,0 +1,63 @@
+.\"	Title : xdg-terminal-exec
+.\"	Author : Nathan Pratta Teodosio
+.\"	June, 2024
+.\"
+.TH XDG-TERMINAL-EXEC 1 "Xdg-terminal-exec manual"
+.SH NAME
+xdg-terminal-exec \- terminal execution utility
+.SH SYNOPSIS
+\fBxdg-terminal-exec [command [arguments]]
+.BR
+.SH DESCRIPTION
+Xdg-terminal-exec launches the preferred system terminal, as determined
+by the XDG specification.
+
+The preferred terminal is determined from the following config files, in
+order of decreasing priority:
+
+    ${HOME}/.config/${desktop}-xdg-terminals.list
+    ${HOME}/.config/xdg-terminals.list
+    /etc/xdg/${desktop}-xdg-terminals.list
+    /etc/xdg/xdg-terminals.list
+
+Which shall contain the desired terminals in the form of desktop entries
+as found in
+
+    ${HOME}/.local/share/applications/
+    /usr/local/share/applications/
+    /usr/share/applications/
+
+Where \fI${desktop}\fP is a lowercased string that can be matched
+(case-insensitively) against items of \fI$XDG_CURRENT_DESKTOP\fP in order
+of decreasing priority.
+
+.SH OPTIONS
+If run without any arguments, only the terminal itself will be launched.
+
+If command and, possibly, its arguments are given, the terminal will be
+launched with the corresponding command argument list being executed.
+
+.SH ENVIRONMENT
+.TP
+.B DEBUG
+Print debug statements to stderr.
+
+.SH EXAMPLES
+A ${HOME}/.config/xdg-terminals.list with
+
+    non-existent.desktop
+    debian-xterm.desktop
+    st.desktop
+
+will cause \fBxdg-terminal-exec\fP to launch Xterm (assuming
+non-existent.desktop does not exist and debian-xterm.desktop does).
+
+.SH SEE ALSO
+For more comprehensive instructions please read the documentation in
+\fI/usr/share/doc/xdg-terminal-exec/\fP
+or consult the package's homepage as listed in
+\fBapt show xdg-terminal-exec\fP.
+
+.SH AUTHORS
+This manual page was originally written by Nathan Teodosio
+for the Debian project.
