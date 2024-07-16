@@ -85,28 +85,60 @@ without special argument, this key can be explicitly set to an empty value
 (execution argument will be omitted). Although in this case it is recommended to
 use `--` if the terminal handles it correctly.
 
-Whether launched terminal process waits for command to finish or exits
-immediately (i.e. after sending IPC request to a master process) is not defined
-by the this spec. Some IPC-using terminals provide separate entries or
+### Additional argument keys
+
+Implementations should expect these keys prefixed with `X-` while the spec is
+in proposed status.
+
+If argument expects a value and is defined as ending with `=`, value should be
+appended to the same argument without a whitespace.
+
+- `AppIdArg=` - argument to set `app-id` (Wayland).
+- `ClassArg=` - argument to set `WM_CLASS` (X11).
+- `IdFallback=` - boolean, allow fallback between `AppIdArg` and `ClassArg` if
+  requested one is not supported but other one is. Default: `false`
+- `TitleArg=` - argument to set window title.
+- `DirArg=` - argument to set working directory.
+- `HoldArg=` - argument to hold terminal open after requested command exits.
+
+Since terminal emulators have varying set of features, any option support is
+considred best effort. Whether launched terminal process waits for command to
+finish or exits immediately (i.e. after sending IPC request to a master process)
+is not defined by the this spec. Some IPC-using terminals provide separate
+entries or
 [actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html)
 for launching separate processes without IPC.
 
 ## Syntax
 
 ```
-xdg-terminal-exec [command [arguments]]
+xdg-terminal-exec [-[-]options ...] [command [arguments ...]]
 ```
 
-If run without any arguments, only the terminal itself (value of `Exec=`) is
-executed.
+A set of arguments each starting with `-` and located at the beginning of the
+input command line is considered to be options processed by the implementation
+and should always be discarded from the resulting command line, inlcuding `-e`
+or any matching execution argument. Option processing should end on `--`, `-e`,
+or matching execution argument.
 
-If a command (with or witout its arguments) is given, then values of both
-`Exec=` and `X-ExecArg=` (if not explicitly empty) are used, along with provided
-command and arguments that are transmitted as is.
+Each option should be monolithic: as a single argument, value (if applicable)
+delimited by `=`. Recognized options:
 
-If `-e` or matching execution argument is given explicitly as the first argument
-on the command line, it should be discarded for backwards compatibility with
-software that hardcodes these arguments.
+- `--app-id=`
+- `--class=`
+- `--id-fallback`
+- `--title=`
+- `--dir=`
+- `--hold`
+
+Requested options then translated into arguments according to the keys existing
+in the terminal's Desktop Entry (or discarded otherwise).
+
+If a command (with or witout its arguments) is given, and `ExecArg=` key is
+not explicitly empty, then the value `ExecArg=` (defaulting to `-e`) is
+appended as the next argument.
+
+Next the command and arguments are passed as is.
 
 The resulting command is executed without forking.
 
