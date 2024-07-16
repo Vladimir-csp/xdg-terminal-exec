@@ -4,6 +4,11 @@ Proposal for XDG Default Terminal Execution Specification and reference
 shell-based implementation. The proposal PR can be found
 [here](https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3/diffs).
 
+(!) Please be advised that while this spec is in proposed state, backwards
+compatibility is maintained as best effort and is not guaranteed.
+
+Current major change pending in this implementation: discardable options.
+
 # Default Terminal Execution Specification
 
 This configuration spec is crafted in image of
