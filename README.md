@@ -8,6 +8,7 @@ shell-based implementation. The proposal PR can be found
 compatibility is maintained as best effort and is not guaranteed.
 
 Current major change pending in this implementation: discardable options.
+(not implemented yet)
 
 # Default Terminal Execution Specification
 
