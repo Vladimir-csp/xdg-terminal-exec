@@ -598,13 +598,31 @@ fi
 # Store original argument list, before it's modified
 debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
 
-# drop -e or custom ExecArg if given as the first arg
-case "${1-}" in
-'-e' | "$EXECARG")
-	debug "dropping '$1' from received args"
-	shift
-	;;
-esac
+# process/discard options
+debug "option processing"
+while [ "$#" -gt "0" ]; do
+	case "$1" in
+	--)
+		debug "found explicit end of options $1"
+		shift
+		break
+		;;
+	-e | "$EXECARG")
+		debug "found exec arg $1"
+		shift
+		break
+		;;
+	[!-]*)
+		debug "found non-option $1"
+		break
+		;;
+	-*)
+		debug "discarding unknown option $1"
+		shift
+		;;
+	esac
+done
+debug "end of option processing"
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
 if [ "$#" -gt 0 ]; then
