@@ -1,4 +1,6 @@
 XDG-TERMINAL-EXEC(1)
+; scdoc manpage, build and compress:
+; scdoc < xdg-terminal-exec.1.scd | gzip -c > xdg-terminal-exec.1.gz
 
 # NAME
 
