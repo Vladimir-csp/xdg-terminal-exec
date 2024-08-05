@@ -15,7 +15,7 @@ Current major change pending in this implementation: discardable options.
 This configuration spec is crafted in image of
 [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest)
 and fully relies on
-[basedir-spec](https://standards.freedesktop.org/basedir-spec/latest).
+[basedir-spec](https://specifications.freedesktop.org/basedir-spec/latest).
 
 Terminal emulators (with their exec arguments) are described by stock Desktop
 Entries located in `applications` subdirs of XDG data hierarchy and marked by
