@@ -13,21 +13,21 @@ Current major change pending in this implementation: discardable options.
 # Default Terminal Execution Specification
 
 This configuration spec is crafted in image of
-[mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest/ar01s02.html)
+[mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest)
 and fully relies on
-[basedir-spec](https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html).
+[basedir-spec](https://standards.freedesktop.org/basedir-spec/latest).
 
 Terminal emulators (with their exec arguments) are described by stock Desktop
 Entries located in `applications` subdirs of XDG data hierarchy and marked by
 `TerminalEmulator` category.
 
 Preferred terminals are configured by listing their
-[entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s02.html#desktop-file-id)
+[entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/file-naming.html#desktop-file-id)
 in config files named `${desktop}-xdg-terminals.list` or `xdg-terminals.list`
 placed in XDG config hierarchy. The format is a simple newline-separated list.
 
 Optionally an entry ID can be suffixed with
-[action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html),
+[action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html),
 delimited by `:` (`entry-id.desktop:action-id`).
 
 Empty lines and lines starting with `#` are ignored, dangling whitespaces are
@@ -112,7 +112,7 @@ considred best effort. Whether launched terminal process waits for command to
 finish or exits immediately (i.e. after sending IPC request to a master process)
 is not defined by the this spec. Some IPC-using terminals provide separate
 entries or
-[actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/ar01s11.html)
+[actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html)
 for launching separate processes without IPC.
 
 ## Syntax
