@@ -1,0 +1,6 @@
+# This file is intended for low priority configuration:
+# xdg-terminal-exec/xdg-terminals in the last item of $XDG_DATA_DIRS.
+# i.e. /usr/share/xdg-terminal-exec/xdg-terminals
+
+# exclude unsupported terminals from fallback selection
+-org.kde.yakuake.desktop
