@@ -126,27 +126,42 @@ read_cache() {
 			line_num=$((line_num + 1))
 			case "${line_num}_${line}" in
 			1_[0-9a-f]??????????????????????????????[0-9a-f]) cached_hash=$line ;;
-			2_*) cached_exec=$line ;;
-			3_ | 3_*) cached_execarg=$line ;;
-			4_*)
-				# get cmd and break right away, line_num will be left at 4
-				cached_cmd=$line
-				break
-				;;
+			2_*) cached_cmd=$line ;;
+			3_*) cached_exec=$line ;;
+			4_*) cached_execarg=$line ;;
+			5_*) cached_appidarg=$line ;;
+			6_*) cached_classarg=$line ;;
+			7_*) cached_titlearg=$line ;;
+			8_*) cached_dirarg=$line ;;
+			9_*) cached_holdarg=$line ; break ;;
 			*)
 				debug "cache line ${line_num} is invalid: ${line}"
 				return 1
 				;;
 			esac
 		done < "${CACHE_FILE}"
-		if [ "$line_num" = "4" ]; then
-			debug "got cache:" "${cached_hash}" "${cached_exec}" "${cached_execarg}" "${cached_cmd}"
+		if [ "$line_num" = "9" ]; then
+			debug "got cache:" \
+				"hash=${cached_hash}" \
+				"cmd=${cached_cmd}" \
+				"exec=${cached_exec}" \
+				"execarg=${cached_execarg}" \
+				"appidarg=${cached_appidarg}" \
+				"classarg=${cached_classarg}" \
+				"titlearg=${cached_titlearg}" \
+				"dirarg=${cached_dirarg}" \
+				"holdarg=${cached_holdarg}"
 			IFS=$OIFS
 			HASH=$(gen_hash) || return 1
 			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
 				debug "cache is actual"
 				EXEC=${cached_exec}
 				EXECARG=${cached_execarg}
+				APPIDARG=${cached_appidarg}
+				CLASSARG=${cached_classarg}
+				TITLEARG=${cached_titlearg}
+				DIRARG=${cached_dirarg}
+				HOLDARG=${cached_holdarg}
 				return 0
 			else
 				debug "cache is out-of-date"
@@ -165,7 +180,7 @@ read_cache() {
 alias read_cache='IFS= read_cache'
 
 save_cache() {
-	# saves $HASH, $EXEC, $EXECARG, $1 (executable) to cache file or removes it if CACHE_ENABLE is false
+	# saves $HASH, $1 (executable), $EXEC, $EXECARG, other supported args to cache file or removes it if CACHE_ENABLE is false
 	if check_bool "$CACHE_ENABLED"; then
 		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
 		if [ -z "${HASH-}" ]; then
@@ -177,7 +192,16 @@ save_cache() {
 		fi
 		UM=$(umask)
 		umask 0077
-		printf '%s\n' "${HASH}" "${EXEC}" "${EXECARG}" "${1}" > "${CACHE_FILE}"
+		printf '%s\n' \
+			"${HASH}" \
+			"${1}" \
+			"${EXEC}" \
+			"${EXECARG}" \
+			"${APPIDARG}" \
+			"${CLASSARG}" \
+			"${TITLEARG}" \
+			"${DIRARG}" \
+			"${HOLDARG}" > "${CACHE_FILE}"
 		umask "$UM"
 		debug ">     saved cache:" "${HASH}" "${EXEC}" "${EXECARG}" "${1}" "^     end of saved cache"
 	else
@@ -314,6 +338,18 @@ replace() {
 	echo "$string"
 }
 
+reset_keys() {
+	# init vars used in entry checks
+	IS_TERMINAL=''
+	EXEC=''
+	EXECARG='-e'
+	APPIDARG=''
+	CLASSARG=''
+	TITLEARG=''
+	DIRARG=''
+	HOLDARG=''
+}
+
 # Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
 	debug "registering entries"
@@ -445,6 +481,31 @@ check_entry_key() {
 		EXECARG=$value
 		debug "read ExecArg '$EXECARG'"
 		;;
+	'X-AppIdArg'*=* | 'AppIdArg'*=*)
+		# Set global variable
+		APPIDARG=$value
+		debug "read AppIdArg '$APPIDARG'"
+		;;
+	'X-ClassArg'*=* | 'ClassArg'*=*)
+		# Set global variable
+		CLASSARG=$value
+		debug "read ClassArg '$CLASSARG'"
+		;;
+	'X-TitleArg'*=* | 'TitleArg'*=*)
+		# Set global variable
+		TITLEARG=$value
+		debug "read TitleArg '$TITLEARG'"
+		;;
+	'X-DirArg'*=* | 'DirArg'*=*)
+		# Set global variable
+		DIRARG=$value
+		debug "read DirArg '$DIRARG'"
+		;;
+	'X-HoldArg'*=* | 'HoldArg'*=*)
+		# Set global variable
+		HOLDARG=$value
+		debug "read HoldArg '$HOLDARG'"
+		;;
 	'TryExec'*=*)
 		debug "checking TryExec executable '$value'"
 		command -v "$value" > /dev/null || return 1
@@ -503,9 +564,7 @@ read_entry_path() {
 			# Check the key
 			check_entry_key "$line" "$value" "$entry_action" "$read_exec" "$de_checks" && continue
 			# Reset values that might have been set
-			unset EXEC
-			unset EXECARG
-			unset IS_TERMINAL
+			reset_keys
 			# shellcheck disable=SC2016
 			debug "entry discarded"
 			return 1
@@ -589,8 +648,6 @@ find_entry() {
 		[ -z "${EXEC-}" ] && continue
 		# ensure entry is a Terminal Emulator
 		[ -z "${IS_TERMINAL-}" ] && continue
-		# Set defaults
-		: "${EXECARG="-e"}"
 		# Entry is valid, stop
 		return 0
 	done
@@ -607,10 +664,7 @@ LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' 
 # this will receive proper value later
 APPLICATIONS_DIRS=''
 
-# init vars used in iterations
-IS_TERMINAL=''
-EXEC=''
-EXECARG='-e'
+reset_keys
 
 # path iterators
 make_paths
@@ -661,6 +715,12 @@ debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXE
 
 # process/discard options
 debug "option processing"
+APPIDVAL=''
+CLASSVAL=''
+IDFALLBACK=false
+TITLEVAL=''
+DIRVAL=''
+HOLD=false
 while [ "$#" -gt "0" ]; do
 	case "$1" in
 	--)
@@ -673,6 +733,49 @@ while [ "$#" -gt "0" ]; do
 		shift
 		break
 		;;
+	--app-id=*)
+		debug "found option $1"
+		IFS='=' read -r _opt APPIDVAL <<- EOF
+			$1
+		EOF
+		debug "set app-id option to $APPIDVAL"
+		shift
+		;;
+	--class=*)
+		debug "found option $1"
+		IFS='=' read -r _opt CLASSVAL <<- EOF
+			$1
+		EOF
+		debug "set class option to $CLASSVAL"
+		shift
+		;;
+	--id-fallback)
+		debug "found option $1"
+		IDFALLBACK=true
+		shift
+		;;
+	--title=*)
+		debug "found option $1"
+		IFS='=' read -r _opt TITLEVAL <<- EOF
+			$1
+		EOF
+		debug "set title option to $DIRVAL"
+		shift
+		;;
+	--dir=*)
+		debug "found option $1"
+		IFS='=' read -r _opt DIRVAL <<- EOF
+			$1
+		EOF
+		debug "set dir option to $DIRVAL"
+		shift
+		;;
+	--hold)
+		debug "found option $1"
+		HOLD=true
+		debug "set HOLD=true"
+		shift
+		;;
 	[!-]*)
 		debug "found non-option $1"
 		break
@@ -683,14 +786,113 @@ while [ "$#" -gt "0" ]; do
 		;;
 	esac
 done
-debug "end of option processing"
+debug "end of option processing, prependig options"
+
+# option prepend
+if [ "$#" -gt 0 ] && [ -n "$EXECARG" ]; then
+	set -- "$EXECARG" "$@"
+	debug "prepended $1"
+fi
+
+if [ -n "$HOLDARG" ] && check_bool "$HOLD"; then
+	set -- "${HOLDARG}" "$@"
+	debug "prepended $1"
+elif [ -z "$HOLDARG" ] && check_bool "$HOLD"; then
+	debug "terminal entry has no HoldArg="
+fi
+
+if [ -n "$DIRARG" ] && [ -n "$DIRVAL" ]; then
+	case "$DIRARG" in
+	*=)
+		set -- "${DIRARG}${DIRVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${DIRARG}" "${DIRVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$DIRARG" ] && [ -n "$DIRVAL" ]; then
+	debug "terminal entry has no DirArg="
+fi
+
+if [ -n "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
+	case "$TITLEARG" in
+	*=)
+		set -- "${TITLEARG}${TITLEVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${TITLEARG}" "${TITLEVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
+	debug "terminal entry has no TitleArg="
+fi
+
+if [ -n "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
+	case "$CLASSARG" in
+	*=)
+		set -- "${CLASSARG}${CLASSVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${CLASSARG}" "${CLASSVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -z "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
+	debug "terminal entry has no ClassArg=, falling back to AppIdArg="
+	case "$CLASSARG" in
+	*=)
+		set -- "${APPIDARG}${CLASSVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${APPIDARG}" "${CLASSVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -n "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
+	debug "terminal entry has no ClassArg=, can not fallback to AppIdArg= is disabled since app-id option also requested"
+elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
+	debug "terminal entry has no ClassArg= and fallback to AppIdArg= is disabled"
+fi
+
+if [ -n "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
+	case "$APPIDARG" in
+	*=)
+		set -- "${APPIDARG}${APPIDVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${APPIDARG}" "${APPIDVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -z "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
+	debug "terminal entry has no AppIdArg=, falling back to ClassArg="
+	case "$APPIDARG" in
+	*=)
+		set -- "${CLASSARG}${APPIDVAL}" "$@"
+		debug "prepended $1"
+		;;
+	*)
+		set -- "${CLASSARG}" "${APPIDVAL}" "$@"
+		debug "prepended $1 $2"
+		;;
+	esac
+elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -n "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
+	debug "terminal entry has no AppIdArg=, can not fallback to ClassArg= since class option also requested"
+elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
+	debug "terminal entry has no AppIdArg= and fallback to ClassArg= is disabled"
+fi
+
+debug "end of option prepending"
 
 # `Implementations must undo quoting [in the Exec argument(s)][...]`
-if [ "$#" -gt 0 ]; then
-	eval "set -- $EXEC ${EXECARG:+'"$EXECARG"'} \"\$@\""
-else
-	eval "set -- $EXEC"
-fi
+eval "set -- $EXEC \"\$@\""
 
 debug ">     final args:" "$@" "^     end of final args"
 
