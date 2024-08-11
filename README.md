@@ -23,15 +23,56 @@ Entries located in `applications` subdirs of XDG data hierarchy and marked by
 
 Preferred terminals are configured by listing their
 [entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/file-naming.html#desktop-file-id)
-in config files named `${desktop}-xdg-terminals.list` or `xdg-terminals.list`
-placed in XDG config hierarchy. The format is a simple newline-separated list.
-
-Optionally an entry ID can be suffixed with
+in configuration files. Optionally an entry ID can be suffixed with
 [action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html),
 delimited by `:` (`entry-id.desktop:action-id`).
 
+## Configuration location
+
+Configuration files are named `${desktop}-xdg-terminals.list` or `xdg-terminals.list`
+and placed in XDG config hierarchy.
+
+`${desktop}` here is a lowercased string that can be matched
+(case-insensitively) against items of `$XDG_CURRENT_DESKTOP` (a colon-separated
+list of names for the current DE) in order of decreasing priority.
+
+Lower priority fallback config files (for upstream/distribution usage) are
+paced in system part of XDG data hierarchy within `xdg-terminal-exec` subdirs.
+
+Default paths for configuration and data are resolved into (in order of
+decreasing priority):
+
+- config files:
+  - main config sequence (in `${XDG_CONFIG_HOME}:${XDG_CONFIG_DIRS}`):
+    - `${HOME}/.config/${desktop}-xdg-terminals.list`
+    - `${HOME}/.config/xdg-terminals.list`
+    - `/etc/xdg/${desktop}-xdg-terminals.list`
+    - `/etc/xdg/xdg-terminals.list`
+  - upstream/distribution config fallbacks (subdirs in `${XDG_DATA_DIRS}`):
+    - `/usr/local/share/xdg-terminal-exec/${desktop}-xdg-terminals.list`
+    - `/usr/local/share/xdg-terminal-exec/xdg-terminals.list`
+    - `/usr/share/xdg-terminal-exec/${desktop}-xdg-terminals.list`
+    - `/usr/share/xdg-terminal-exec/xdg-terminals.list`
+- desktop entries (in `${XDG_DATA_HOME}:${XDG_DATA_DIRS}`):
+  - `${HOME}/.local/share/applications/`
+  - `/usr/local/share/applications/`
+  - `/usr/share/applications/`
+
+## Configuration file format
+
+The format is a simple newline-separated list with decreasing priority.
+
 Empty lines and lines starting with `#` are ignored, dangling whitespaces are
 trimmed.
+
+Line format:
+
+`terminal.desktop` or `terminal.desktop:action`: marks entry for explicit
+selection.
+
+`-terminal.desktop` excludes entry from fallback selection.
+
+`+terminal.desktop` protects entry from fallback exclusion.
 
 Special directives for modifying behavior of implementations may be present in
 config files. Directives that are not listed by this spec and are not understood
@@ -41,39 +82,28 @@ Directives should not contain `.desktop` substring in them. And it is
 recommended to start directives with a symbol that is not valid for entry ID,
 i.e. `/`.
 
-Default paths for configuration and data are resolved into (in order of
-decreasing priority):
-
-- config files (in `${XDG_CONFIG_HOME}:${XDG_CONFIG_DIRS}`):
-  - `${HOME}/.config/${desktop}-xdg-terminals.list`
-  - `${HOME}/.config/xdg-terminals.list`
-  - `/etc/xdg/${desktop}-xdg-terminals.list`
-  - `/etc/xdg/xdg-terminals.list`
-- desktop entries (in `${XDG_DATA_HOME}:${XDG_DATA_DIRS}`):
-  - `${HOME}/.local/share/applications/`
-  - `/usr/local/share/applications/`
-  - `/usr/share/applications/`
-
-Where `${desktop}` is a lowercased string that can be matched
-(case-insensitively) against items of `$XDG_CURRENT_DESKTOP` (a colon-separated
-list of names for the current DE) in order of decreasing priority.
-
 ## Priority of selecting an entry
 
-- A list of explicitly preferred entry IDs is composed by taking previously
-  unseen IDs:
+- A list of explicitly preferred entry IDs and fallback exclusions is composed
+  by taking previously unseen IDs:
   - from each dir of XDG config hierarchy in the order of decreasing priority:
     - from `${desktop}-xdg-terminals.list` files in the order of
       `$XDG_CURRENT_DESKTOP` items
     - from `xdg-terminals.list`
-- Each entry from the resulting list is checked for applicability:
+  - from each dir of system XDG data hierarchy in the order of decreasing
+    priority:
+    - from `xdg-terminal-exec/${desktop}-xdg-terminals.list` files in the order
+      of `$XDG_CURRENT_DESKTOP` items
+    - from `xdg-terminal-exec/xdg-terminals.list`
+- Each entry from the explicit selection list is checked for applicability:
   - presense of `TerminalEmulator` category
   - validation by the same rules as in Desktop Entry Spec, except `*ShowIn`
     conditions
   - entry is discarded if it does not pass the checks
   - the first applicable entry is used
-- If no applicable entry is found, each entry from XDG data hierarchy (except
-  those discarded earlier) is checked for applicability:
+- If no applicable entry is found, fallback selection is performed from entries
+  in XDG data hierarchy (except those discarded and excluded earlier). Each is
+  checked for applicability:
   - presense of `TerminalEmulator` category
   - validation by the same rules as in Desktop Entry Spec, now including
     `*ShowIn` conditions

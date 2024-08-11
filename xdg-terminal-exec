@@ -61,6 +61,15 @@ make_paths() {
 		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminals.list
 	done
 
+	# append xdg-termianl-exec dirs in XDG_DATA_DIRS to config hierarchy for distro/upstream level defaults
+	for dir in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+		# Normalise base path and append the data subdirectory with a trailing '/'
+		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
+			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-termianl-exec/${desktop}-xdg-terminals.list
+		done
+		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-termianl-exec/xdg-terminals.list
+	done
+
 	# Populate list of directories to search for entries in, in ascending order of preference
 	for dir in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
@@ -178,6 +187,15 @@ save_cache() {
 	fi
 }
 
+list_contains() {
+	# checks if list $1 contains item $2 delimited by $3 (default $N)
+	delimiter=${3:-$N}
+	case "${delimiter}${1}${delimiter}" in
+	*"${delimiter}${2}${delimiter}"*) return 0 ;;
+	*) return 1 ;;
+	esac
+}
+
 # Parse all config files and populate $ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
@@ -212,14 +230,47 @@ read_config_paths() {
 			# I do not know of any terminal that starts with a number, but it's valid.
 
 			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
-			[a-zA-Z0-9_]*)
+			[a-zA-Z0-9_]* | [+-][a-zA-Z0-9_]*)
+				case "$line" in
+				[+-]*)
+					# save and cut exclusion marker
+					_line=${line#[+-]}
+					exclusion=${line%$_line}
+					line=$_line
+					;;
+				*) exclusion='' ;;
+				esac
 				# consider only the first ':' as a delimiter
 				IFS=':' read -r entry_id action_id <<- EOL
 					$line
 				EOL
 				if validate_entry_id "${entry_id}" && validate_action_id "${action_id}"; then
-					ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
-					debug "added entry ID with action ID '$line'"
+					case "$exclusion" in
+					'')
+						ENTRY_IDS=${ENTRY_IDS:+${ENTRY_IDS}${N}}$line
+						debug "added entry ID with action ID '$line'"
+						;;
+					'+')
+						if list_contains "${EXCLUDED_ENTRY_IDS}" "${entry_id}"; then
+							debug "entry '${entry_id}' was already excluded from fallback"
+						elif list_contains "${INCLUDED_ENTRY_IDS}" "${entry_id}"; then
+							debug "entry '${entry_id}' fallback exclusion was already prevented"
+						else
+							debug "preventing fallback exclusion for entry '${entry_id}'"
+							INCLUDED_ENTRY_IDS=${INCLUDED_ENTRY_IDS:+${INCLUDED_ENTRY_IDS}${N}}${entry_id}
+						fi
+						;;
+					'-')
+						if list_contains "${INCLUDED_ENTRY_IDS}" "${entry_id}"; then
+							debug "entry '${entry_id}' fallback exclusion was already prevented"
+						elif list_contains "${EXCLUDED_ENTRY_IDS}" "${entry_id}"; then
+							debug "entry '${entry_id}' was already excluded from fallback"
+						else
+							debug "excluding entry '${entry_id}' from fallback"
+							EXCLUDED_ENTRY_IDS=${EXCLUDED_ENTRY_IDS:+${EXCLUDED_ENTRY_IDS}${N}}${entry_id}
+						fi
+						;;
+					esac
 				else
 					error "Discarded possibly misspelled entry '$line'"
 				fi
@@ -289,6 +340,11 @@ find_entry_paths() {
 	# Loop through found entry paths and IDs
 	IFS=$N
 	while read -r entry_path && read -r entry_id; do
+		# exclude entries based on EXCLUDED_ENTRY_IDS
+		if list_contains "$EXCLUDED_ENTRY_IDS" "$entry_id"; then
+			debug "entry '${entry_id}' was excluded from fallback"
+			continue
+		fi
 		# Entries are checked in ascending order of preference, so use last found if duplicate
 		# shellcheck disable=SC2139
 		alias "$entry_id"="entry_path='$entry_path'"
@@ -580,6 +636,11 @@ else
 	# All desktop entry ids found in data dirs in descending order of preference,
 	# with duplicates (including those in $ENTRY_IDS) removed
 	FALLBACK_ENTRY_IDS=''
+
+	# Entry IDs excluded from fallback by '-entry.desktop' directives
+	EXCLUDED_ENTRY_IDS=''
+	# Entry IDS included (exclusion prevented) by '+entry.desktop' directives
+	INCLUDED_ENTRY_IDS=''
 
 	# Modifies $ENTRY_IDS
 	read_config_paths
