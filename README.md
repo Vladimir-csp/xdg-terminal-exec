@@ -12,14 +12,13 @@ Current major change pending in this implementation: discardable options.
 
 # Default Terminal Execution Specification
 
-This configuration spec is crafted in image of
+This configuration Specification is crafted in image of
 [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest)
 and fully relies on
 [basedir-spec](https://specifications.freedesktop.org/basedir-spec/latest).
 
 Terminal emulators (with their exec arguments) are described by stock Desktop
-Entries located in `applications` subdirs of XDG data hierarchy and marked by
-`TerminalEmulator` category.
+Entries located in `applications` subdirs of XDG data hierarchy.
 
 Preferred terminals are configured by listing their
 [entry IDs](https://specifications.freedesktop.org/desktop-entry-spec/latest/file-naming.html#desktop-file-id)
@@ -27,7 +26,53 @@ in configuration files. Optionally an entry ID can be suffixed with
 [action ID](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html),
 delimited by `:` (`entry-id.desktop:action-id`).
 
-## Configuration location
+## Desktop entry for a terminal
+
+Stock Desktop Entries for terminal emulator applications are used. Entry
+eligible for selection should have `TerminalEmulator` Category and `ExecArg=`
+key (`X-ExecArg=` while the Specification is in proposed status) which contains
+command executon argument: an argument to be placed before command if it is
+requested. If the terminal accepts commands without special argument, this key
+should be explicitly set to an empty value (execution argument will be omitted).
+Although in this case it is recommended to use `--` if the terminal handles it
+correctly.
+
+### \[X-\]ExecArg Transition Exception
+
+Before and during initial adoption phase of this Specification, implementations
+are allowed to not require `[X-]ExecArg=` key's existence in Desktop Entries and
+rely only on `TerminalEmulator` category. Execution argument can be defaulted to
+`-e`, or determined by implementation-specific means, like a list of defaults
+for known terminals.
+
+### Additional argument keys
+
+Implementations should expect these keys prefixed with `X-` while the
+Specification is in proposed status.
+
+If argument expects a value and is defined as ending with `=`, value should be
+appended to the same argument without a whitespace.
+
+- `AppIdArg=` - argument to set `app-id` (Wayland).
+- `ClassArg=` - argument to set `WM_CLASS` (X11).
+- `IdFallback=` - boolean, allow fallback between `AppIdArg` and `ClassArg` if
+  requested one is not supported but other one is. Default: `false`
+- `TitleArg=` - argument to set window title.
+- `DirArg=` - argument to set working directory.
+- `HoldArg=` - argument to hold terminal open after requested command exits.
+
+Since terminal emulators have varying set of features, any option support is
+considred best effort.
+
+Whether launched terminal process waits for command to finish or exits
+immediately (i.e. after sending IPC request to a master process) is not defined
+by the this Specification. Some IPC-using terminals provide separate entries or
+[actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html)
+for launching separate processes without IPC.
+
+## Configuration
+
+### Location
 
 Configuration files are named `${desktop}-xdg-terminals.list` or `xdg-terminals.list`
 and placed in XDG config hierarchy.
@@ -58,7 +103,7 @@ decreasing priority):
   - `/usr/local/share/applications/`
   - `/usr/share/applications/`
 
-## Configuration file format
+### File format
 
 The format is a simple newline-separated list with decreasing priority.
 
@@ -75,8 +120,8 @@ selection.
 `+terminal.desktop` protects entry from fallback exclusion.
 
 Special directives for modifying behavior of implementations may be present in
-config files. Directives that are not listed by this spec and are not understood
-by a particular implementation should be discarded.
+config files. Directives that are not listed by this Specification and are not
+understood by a particular implementation should be discarded.
 
 Directives should not contain `.desktop` substring in them. And it is
 recommended to start directives with a symbol that is not valid for entry ID,
@@ -97,53 +142,20 @@ i.e. `/`.
     - from `xdg-terminal-exec/xdg-terminals.list`
 - Each entry from the explicit selection list is checked for applicability:
   - presense of `TerminalEmulator` category
-  - validation by the same rules as in Desktop Entry Spec, except `*ShowIn`
-    conditions
+  - validation by the same rules as in Desktop Entry Specification, except
+    `*ShowIn` conditions
   - entry is discarded if it does not pass the checks
   - the first applicable entry is used
 - If no applicable entry is found, fallback selection is performed from entries
   in XDG data hierarchy (except those discarded and excluded earlier). Each is
   checked for applicability:
   - presense of `TerminalEmulator` category
-  - validation by the same rules as in Desktop Entry Spec, now including
-    `*ShowIn` conditions
+  - validation by the same rules as in Desktop Entry Specification, now
+    including `*ShowIn` conditions
   - the first applicable entry is used
     - the order in which found entries under the same base directory are checked
       in is undefined
 - If no applicable entry is found, an error is returned.
-
-## Desktop entry for a terminal
-
-Stock Desktop Entry for terminal emulator may be used. Command execution
-argument defaults to `-e`. Key `ExecArg=` (`X-ExecArg=` while the spec is in
-proposed status) can be used to override it. If the terminal accepts commands
-without special argument, this key can be explicitly set to an empty value
-(execution argument will be omitted). Although in this case it is recommended to
-use `--` if the terminal handles it correctly.
-
-### Additional argument keys
-
-Implementations should expect these keys prefixed with `X-` while the spec is
-in proposed status.
-
-If argument expects a value and is defined as ending with `=`, value should be
-appended to the same argument without a whitespace.
-
-- `AppIdArg=` - argument to set `app-id` (Wayland).
-- `ClassArg=` - argument to set `WM_CLASS` (X11).
-- `IdFallback=` - boolean, allow fallback between `AppIdArg` and `ClassArg` if
-  requested one is not supported but other one is. Default: `false`
-- `TitleArg=` - argument to set window title.
-- `DirArg=` - argument to set working directory.
-- `HoldArg=` - argument to hold terminal open after requested command exits.
-
-Since terminal emulators have varying set of features, any option support is
-considred best effort. Whether launched terminal process waits for command to
-finish or exits immediately (i.e. after sending IPC request to a master process)
-is not defined by the this spec. Some IPC-using terminals provide separate
-entries or
-[actions](https://specifications.freedesktop.org/desktop-entry-spec/latest/extra-actions.html)
-for launching separate processes without IPC.
 
 ## Syntax
 
@@ -217,6 +229,13 @@ parsing in search of an applicable terminal among them.
 Having a valid entry specified in `*xdg-terminals.list` speeds up the process
 significantly, shifting the bottleneck to `find` calls for composing the list of
 desktop entries.
+
+### ExecArg defaults
+
+This implementation supports `/execarg_default:entry.desktop:arg` directives for
+replacing `-e` default with a custom one for specific Entry IDs. It is not part
+of the Spec, but a way to make things work until the Spec is made official and
+upstream starts shipping correct `ExecArg` values.
 
 ### Cache
 
