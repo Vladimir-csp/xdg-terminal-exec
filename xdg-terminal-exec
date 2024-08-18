@@ -246,6 +246,18 @@ read_config_paths() {
 				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
 				;;
 
+			# default ExecArg overrides
+			/execarg_default:*:*)
+				IFS=':' read -r _directive entry_id execarg_default <<- EOF
+					$line
+				EOF
+				if validate_entry_id "${entry_id}"; then
+					debug "added ExecArg default '${execarg_default}' for '${entry_id}'"
+					# do not bother with deduplication, first entry ID will win
+					EXECARG_DEFAULTS=${EXECARG_DEFAULTS}${EXECARG_DEFAULTS:+$N}${entry_id}:${execarg_default}
+				fi
+				;;
+
 			# `[The extensionless entry filename] should be a valid D-Bus well-known name.`
 			# `a sequence of non-empty elements separated by dots (U+002E FULL STOP),
 			# none of which starts with a digit, and each of which contains only characters from the set [a-zA-Z0-9-_]`
@@ -259,7 +271,7 @@ read_config_paths() {
 				[+-]*)
 					# save and cut exclusion marker
 					_line=${line#[+-]}
-					exclusion=${line%$_line}
+					exclusion=${line%"$_line"}
 					line=$_line
 					;;
 				*) exclusion='' ;;
@@ -343,6 +355,7 @@ reset_keys() {
 	IS_TERMINAL=''
 	EXEC=''
 	EXECARG='-e'
+	EXECARG_DEFINED=false
 	APPIDARG=''
 	CLASSARG=''
 	TITLEARG=''
@@ -479,6 +492,7 @@ check_entry_key() {
 	'X-ExecArg'*=* | 'ExecArg'*=*)
 		# Set global variable
 		EXECARG=$value
+		EXECARG_DEFINED=true
 		debug "read ExecArg '$EXECARG'"
 		;;
 	'X-AppIdArg'*=* | 'AppIdArg'*=*)
@@ -648,6 +662,10 @@ find_entry() {
 		[ -z "${EXEC-}" ] && continue
 		# ensure entry is a Terminal Emulator
 		[ -z "${IS_TERMINAL-}" ] && continue
+		# if entry lacks ExecArg, get (custom) default
+		if [ "$EXECARG_DEFINED" != "true" ]; then
+			EXECARG=$(get_default_execarg "$entry_id")
+		fi
 		# Entry is valid, stop
 		return 0
 	done
@@ -658,12 +676,34 @@ find_entry() {
 # Mask IFS withing function to allow temporary changes
 alias find_entry='IFS= find_entry'
 
+get_default_execarg() {
+	# based on entry_id ($1) return ExecArg from EXECARG_DEFAULTS
+	check_entry=$1
+	while IFS=':' read -r entry_id execarg_default; do
+		case "$entry_id" in
+		"$check_entry")
+			printf '%s' "$execarg_default"
+			debug "custom default ExecArg '$execarg_default' for '$check_entry'"
+			return 0
+			;;
+		esac
+	done <<- EOF
+		$EXECARG_DEFAULTS
+	EOF
+	printf '%s' '-e'
+	debug "using default ExecArg '-e' for '$check_entry'"
+}
+
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
 
 # this will receive proper value later
 APPLICATIONS_DIRS=''
 
+# this will be filled with values from /execarg_default:*:* directives
+EXECARG_DEFAULTS=''
+
+# this (re)sets vars to be filled from desktop entry
 reset_keys
 
 # path iterators

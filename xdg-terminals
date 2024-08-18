@@ -4,3 +4,17 @@
 
 # exclude unsupported terminals from fallback selection
 -org.kde.yakuake.desktop
+
+# add custom ExecArg defaults for various terminals, derived from:
+# https://github.com/albertlauncher/albert/blob/6783257df7e15dcfbae49d03023414b7c3692dbd/src/app/terminalprovider.cpp#L120-L150
+/execarg_default:com.raggesilver.BlackBox.desktop:--
+/execarg_default:contour.desktop:execute
+/execarg_default:deepin-terminal.desktop:-x
+/execarg_default:io.elementary.terminal.desktop:-x
+/execarg_default:org.codeberg.dnkl.foot.desktop:--
+/execarg_default:org.gnome.Terminal.desktop:--
+/execarg_default:kitty.desktop:--
+/execarg_default:mate-terminal.desktop:-x
+/execarg_default:roxterm.desktop:-x
+/execarg_default:terminator.desktop:-x
+/execarg_default:xfce4-terminal.desktop:-x
