@@ -180,7 +180,7 @@ read_cache() {
 alias read_cache='IFS= read_cache'
 
 save_cache() {
-	# saves $HASH, $1 (executable), $EXEC, $EXECARG, other supported args to cache file or removes it if CACHE_ENABLE is false
+	# saves $HASH, $1 (executable), $EXEC, $EXECARG, other supported args to cache file or removes it if CACHE_ENABLED is false
 	if check_bool "$CACHE_ENABLED"; then
 		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
 		if [ -z "${HASH-}" ]; then
@@ -238,16 +238,38 @@ read_config_paths() {
 
 			# cache control
 			/enable_cache)
-				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
-				CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
+				debug "found '$line' directive${CACHE_CONFIGURED:+ (ignored)}"
+				[ -z "$CACHE_CONFIGURED" ] || continue
+				CACHE_ENABLED=true
+				CACHE_CONFIGURED=1
 				;;
 			/disable_cache)
-				debug "found '$line' directive${XTE_CACHE_ENABLED+ (ignored)}"
-				CACHE_ENABLED=${XTE_CACHE_ENABLED-false}
+				debug "found '$line' directive${CACHE_CONFIGURED:+ (ignored)}"
+				[ -z "$CACHE_CONFIGURED" ] || continue
+				CACHE_ENABLED=false
+				CACHE_CONFIGURED=1
+				;;
+
+			# compat mode
+			/execarg_compat)
+				debug "found '$line' directive${EXECARG_COMPAT_CONFIGURED:+ (ignored)}"
+				[ -z "$EXECARG_COMPAT_CONFIGURED" ] || continue
+				EXECARG_COMPAT=true
+				EXECARG_COMPAT_CONFIGURED=1
+				;;
+			/execarg_strict)
+				debug "found '$line' directive${EXECARG_COMPAT_CONFIGURED:+ (ignored)}"
+				[ -z "$EXECARG_COMPAT_CONFIGURED" ] || continue
+				EXECARG_COMPAT=false
+				EXECARG_COMPAT_CONFIGURED=1
 				;;
 
 			# default ExecArg overrides
 			/execarg_default:*:*)
+				if ! check_bool "$EXECARG_COMPAT"; then
+					debug "ignored directive '$line' (strict mode)"
+					continue
+				fi
 				IFS=':' read -r _directive entry_id execarg_default <<- EOF
 					$line
 				EOF
@@ -575,7 +597,7 @@ read_entry_path() {
 			value=${line#*=}
 			# Remove all but leading spaces, and trim that from the value
 			value=${value#"${value%%[! ]*}"}
-			# Check the key
+			# Check the key, continue to next line on success
 			check_entry_key "$line" "$value" "$entry_action" "$read_exec" "$de_checks" && continue
 			# Reset values that might have been set
 			reset_keys
@@ -659,12 +681,18 @@ find_entry() {
 		unalias "$entry_id"
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
 		# Check that the entry is actually executable
-		[ -z "${EXEC-}" ] && continue
+		[ -z "${EXEC}" ] && continue
 		# ensure entry is a Terminal Emulator
-		[ -z "${IS_TERMINAL-}" ] && continue
-		# if entry lacks ExecArg, get (custom) default
+		[ -z "${IS_TERMINAL}" ] && continue
+		# if entry lacks ExecArg
 		if [ "$EXECARG_DEFINED" != "true" ]; then
-			EXECARG=$(get_default_execarg "$entry_id")
+			# get (custom) default in compat mode
+			if check_bool "$EXECARG_COMPAT"; then
+				EXECARG=$(get_default_execarg "$entry_id")
+			# discard entry in strict mode
+			else
+				continue
+			fi
 		fi
 		# Entry is valid, stop
 		return 0
@@ -697,6 +725,11 @@ get_default_execarg() {
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
 
+# compat mode
+EXECARG_COMPAT=${XTE_EXECARG_COMPAT-true}
+# flag reused in directive encounter
+EXECARG_COMPAT_CONFIGURED=${XTE_EXECARG_COMPAT-}
+
 # this will receive proper value later
 APPLICATIONS_DIRS=''
 
@@ -709,16 +742,17 @@ reset_keys
 # path iterators
 make_paths
 
-# At this point we have no way of telling if cache is enabled or not, unless XTE_CACHE_ENABLED is set,
-# so just try reading it as if default is true, otherwise do the usual thing.
-# Editing config to disable cache should invalidate the cache.
-# The true default is false though:
+# At this point we have no way of telling if cache is enabled or not, unless
+# XTE_CACHE_ENABLED is set, so just try reading it by default, otherwise do the
+# usual thing. Editing config to disable cache should invalidate the cache.
 CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
+# flag reused for directive encounter
+CACHE_CONFIGURED=${XTE_CACHE_ENABLED-}
 
 # HASH can be reused
 HASH=''
 
-if check_bool "${XTE_CACHE_ENABLED-true}" && read_cache; then
+if check_bool "${CACHE_ENABLED}" && read_cache; then
 	CACHE_USED=true
 else
 	# continue with globals
