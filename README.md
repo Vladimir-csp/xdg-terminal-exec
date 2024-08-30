@@ -37,14 +37,6 @@ should be explicitly set to an empty value (execution argument will be omitted).
 Although in this case it is recommended to use `--` if the terminal handles it
 correctly.
 
-### \[X-\]ExecArg Transition Exception
-
-Before and during initial adoption phase of this Specification, implementations
-are allowed to not require `[X-]ExecArg=` key's existence in Desktop Entries and
-rely only on `TerminalEmulator` category. Execution argument can be defaulted to
-`-e`, or determined by implementation-specific means, like a list of defaults
-for known terminals.
-
 ### Additional argument keys
 
 Implementations should expect these keys prefixed with `X-` while the
@@ -230,12 +222,17 @@ Having a valid entry specified in `*xdg-terminals.list` speeds up the process
 significantly, shifting the bottleneck to `find` calls for composing the list of
 desktop entries.
 
-### ExecArg defaults
+### Compatibility mode and ExecArg defaults
 
-This implementation supports `/execarg_default:entry.desktop:arg` directives for
-replacing `-e` default with a custom one for specific Entry IDs. It is not part
-of the Spec, but a way to make things work until the Spec is made official and
-upstream starts shipping correct `ExecArg` values.
+This implementation is currently set to compatibility mode by default: `ExecArg`
+presense is not enforced and defaults to `-e`. Defaults can also be amended by
+`/execarg_default:entry.desktop:arg` directives for specific Entry IDs. It is
+not part of the Spec, but a way to make things work until the Spec is made
+official and upstream starts shipping `ExecArg`.
+
+Compat mode is enabled by default and can be controlled by first encountered
+`/execarg_compat`|`/execarg_strict` direcive in the configs or `XTE_EXECARG_COMPAT`
+env var (truthy or falsy value, has priority).
 
 ### Cache
 
