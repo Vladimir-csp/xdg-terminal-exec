@@ -29,13 +29,13 @@ delimited by `:` (`entry-id.desktop:action-id`).
 ## Desktop entry for a terminal
 
 Stock Desktop Entries for terminal emulator applications are used. Entry
-eligible for selection should have `TerminalEmulator` Category and `ExecArg=`
-key (`X-ExecArg=` while the Specification is in proposed status) which contains
-command executon argument: an argument to be placed before command if it is
-requested. If the terminal accepts commands without special argument, this key
-should be explicitly set to an empty value (execution argument will be omitted).
-Although in this case it is recommended to use `--` if the terminal handles it
-correctly.
+eligible for selection should have `TerminalEmulator` Category and
+`X-TerminalArgExec=` key (`X-TerminalArgExec=` while the Specification is in
+proposed status) which contains command execution argument: an argument to be
+placed before command if it is requested. If the terminal accepts commands
+without special argument, this key should be explicitly set to an empty value
+(execution argument will be omitted). Although in this case it is recommended to
+use `--` if the terminal handles it correctly.
 
 ### Additional argument keys
 
@@ -43,15 +43,16 @@ Implementations should expect these keys prefixed with `X-` while the
 Specification is in proposed status.
 
 If argument expects a value and is defined as ending with `=`, value should be
-appended to the same argument without a whitespace.
+appended to the same argument without a white space.
 
-- `AppIdArg=` - argument to set `app-id` (Wayland).
-- `ClassArg=` - argument to set `WM_CLASS` (X11).
-- `IdFallback=` - boolean, allow fallback between `AppIdArg` and `ClassArg` if
-  requested one is not supported but other one is. Default: `false`
-- `TitleArg=` - argument to set window title.
-- `DirArg=` - argument to set working directory.
-- `HoldArg=` - argument to hold terminal open after requested command exits.
+- `X-TerminalArgAppId=` - argument to set `app-id` (Wayland).
+- `X-TerminalArgClass=` - argument to set `WM_CLASS` (X11).
+- `X-TerminalArgIdFallback=` - boolean, allow fallback between `AppId` and
+  `Class` if requested one is not supported but other one is. Default: `false`
+- `X-TerminalArgTitle=` - argument to set window title.
+- `X-TerminalArgDir=` - argument to set working directory.
+- `X-TerminalArgHold=` - argument to hold terminal open after requested command
+  exits.
 
 Since terminal emulators have varying set of features, any option support is
 considred best effort.
@@ -66,8 +67,8 @@ for launching separate processes without IPC.
 
 ### Location
 
-Configuration files are named `${desktop}-xdg-terminals.list` or `xdg-terminals.list`
-and placed in XDG config hierarchy.
+Configuration files are named `${desktop}-xdg-terminals.list` or
+`xdg-terminals.list` and placed in XDG config hierarchy.
 
 `${desktop}` here is a lowercased string that can be matched
 (case-insensitively) against items of `$XDG_CURRENT_DESKTOP` (a colon-separated
@@ -174,9 +175,9 @@ delimited by `=`. Recognized options:
 Requested options then translated into arguments according to the keys existing
 in the terminal's Desktop Entry (or discarded otherwise).
 
-If a command (with or witout its arguments) is given, and `ExecArg=` key is
-not explicitly empty, then the value `ExecArg=` (defaulting to `-e`) is
-appended as the next argument.
+If a command (with or witout its arguments) is given, and `TerminalArgExec=` key
+is not explicitly empty, then the value `TerminalArgExec=` (defaulting to `-e`)
+is appended as the next argument.
 
 Next the command and arguments are passed as is.
 
@@ -222,13 +223,14 @@ Having a valid entry specified in `*xdg-terminals.list` speeds up the process
 significantly, shifting the bottleneck to `find` calls for composing the list of
 desktop entries.
 
-### Compatibility mode and ExecArg defaults
+### Compatibility mode and TerminalArgExec defaults
 
-This implementation is currently set to compatibility mode by default: `ExecArg`
-presense is not enforced and defaults to `-e`. Defaults can also be amended by
+This implementation is currently set to compatibility mode by default: Previous
+style `[X-]ExecArg` execution argument is supported, its presense is not
+enforced and value defaults to `-e`. Defaults can also be amended by
 `/execarg_default:entry.desktop:arg` directives for specific Entry IDs. It is
 not part of the Spec, but a way to make things work until the Spec is made
-official and upstream starts shipping `ExecArg`.
+official and upstream starts shipping `TerminalArgExec`.
 
 Compat mode is enabled by default and can be controlled by first encountered
 `/execarg_compat`|`/execarg_strict` direcive in the configs or `XTE_EXECARG_COMPAT`
