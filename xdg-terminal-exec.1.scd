@@ -18,11 +18,12 @@ supplied command.
 
 Terminal emulators are selected among Desktop Entries that are installed on the
 system, or added by user according to XDG Desktop Entry Spec. Only valid Entries
-with *TerminalEmulator* category are considered.
+with *TerminalEmulator* category and *X-TerminalArgExec=* key set are
+considered (*X-TerminalArgExec=* key is not required in compat mode).
 
-Command execution argument is determined by Entry's *X-ExecArg=* key, assumed to
-be *-e* by default. If an actual *-e* or matching execution argument is given on
-the command line, it will be silently discarded.
+Command execution argument is determined by Entry's *X-TerminalArgExec=* key,
+(assumed to be *-e* by default in compat mode). If an actual *-e* or matching
+execution argument is given on the command line, it will be silently discarded.
 
 It is assumed that the emulator handles command line after the execution
 argument *as is* (preserved separate arguments).
@@ -59,13 +60,23 @@ Otherwise the first found and valid Desktop Entry is used.
 Special directives understood by this implementation (the first encountered
 directive is used):
 
-	*/enable_cache*++
-*/disable_cache*
+	*/enable_cache*, */disable_cache*
 
 The cache feature allows storing selected terminal command line in
 _${XDG_CACHE_HOME}_ to bypass reading and parsing of configuration and Desktop
 Entries until changes are detected in the listing of Desktop Entry files
 or config files (enabled by default).
+
+	*/execarg_compat*, */execarg_strict*
+
+Compat mode (currently enabled by default) allows support for legacy
+*[X-]ExecArg* key and allows entries without execution argument, providing _-e_
+default.
+
+	*/execarg_default:*_entry.desktop_*:*_arg_
+
+Customize defaults for execution arguments of specific terminal entries (only in
+compat mode).
 
 # FILES
 
