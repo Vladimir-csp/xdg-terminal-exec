@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=ExecArg Terminal
+Name=TerminalArgExec Terminal
 Type=Application
-Exec=echo execarg terminal
-X-ExecArg=--
+Exec=echo TerminalArgExec terminal
+X-TerminalArgExec=--
 Categories=TerminalEmulator;

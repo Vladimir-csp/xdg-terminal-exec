@@ -253,7 +253,7 @@ StartupNotify=true
 StartupWMClass=Gnome-terminal
 X-GNOME-SingleWindow=false
 Actions=new-window;preferences;
-X-ExecArg=--
+X-TerminalArgExec=--
 
 [Desktop Action new-window]
 Name[am]=አዲስ መስኮት

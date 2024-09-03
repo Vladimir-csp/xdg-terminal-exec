@@ -264,7 +264,7 @@ read_config_paths() {
 				EXECARG_COMPAT_CONFIGURED=1
 				;;
 
-			# default ExecArg overrides
+			# default TerminalArgExec overrides
 			/execarg_default:*:*)
 				if ! check_bool "$EXECARG_COMPAT"; then
 					debug "ignored directive '$line' (strict mode)"
@@ -274,7 +274,7 @@ read_config_paths() {
 					$line
 				EOF
 				if validate_entry_id "${entry_id}"; then
-					debug "added ExecArg default '${execarg_default}' for '${entry_id}'"
+					debug "added TerminalArgExec default '${execarg_default}' for '${entry_id}'"
 					# do not bother with deduplication, first entry ID will win
 					EXECARG_DEFAULTS=${EXECARG_DEFAULTS}${EXECARG_DEFAULTS:+$N}${entry_id}:${execarg_default}
 				fi
@@ -511,36 +511,46 @@ check_entry_key() {
 		# Default in this case is to succeed
 		return 0
 		;;
-	'X-ExecArg'*=* | 'ExecArg'*=*)
+	'X-TerminalArgExec'*=* | 'TerminalArgExec'*=*)
 		# Set global variable
 		EXECARG=$value
 		EXECARG_DEFINED=true
-		debug "read ExecArg '$EXECARG'"
+		debug "read TerminalArgExec '$EXECARG'"
 		;;
-	'X-AppIdArg'*=* | 'AppIdArg'*=*)
+	'X-ExecArg'*=* | 'ExecArg'*=*)
+		# ignore old ExecArg in strict mode
+		case "${EXECARG_COMPAT}" in
+		false) return 0 ;;
+		esac
+		# Set global variable
+		EXECARG=$value
+		EXECARG_DEFINED=true
+		debug "read TerminalArgExec '$EXECARG'"
+		;;
+	'X-TerminalArgAppId'*=* | 'TerminalArgAppId'*=*)
 		# Set global variable
 		APPIDARG=$value
-		debug "read AppIdArg '$APPIDARG'"
+		debug "read TerminalArgAppId '$APPIDARG'"
 		;;
-	'X-ClassArg'*=* | 'ClassArg'*=*)
+	'X-TerminalArgClass'*=* | 'TerminalArgClass'*=*)
 		# Set global variable
 		CLASSARG=$value
-		debug "read ClassArg '$CLASSARG'"
+		debug "read TerminalArgClass '$CLASSARG'"
 		;;
-	'X-TitleArg'*=* | 'TitleArg'*=*)
+	'X-TerminalArgTitle'*=* | 'TerminalArgTitle'*=*)
 		# Set global variable
 		TITLEARG=$value
-		debug "read TitleArg '$TITLEARG'"
+		debug "read TerminalArgTitle '$TITLEARG'"
 		;;
-	'X-DirArg'*=* | 'DirArg'*=*)
+	'X-TerminalArgDir'*=* | 'TerminalArgDir'*=*)
 		# Set global variable
 		DIRARG=$value
-		debug "read DirArg '$DIRARG'"
+		debug "read TerminalArgDir '$DIRARG'"
 		;;
-	'X-HoldArg'*=* | 'HoldArg'*=*)
+	'X-TerminalArgHold'*=* | 'TerminalArgHold'*=*)
 		# Set global variable
 		HOLDARG=$value
-		debug "read HoldArg '$HOLDARG'"
+		debug "read TerminalArgHold '$HOLDARG'"
 		;;
 	'TryExec'*=*)
 		debug "checking TryExec executable '$value'"
@@ -684,7 +694,7 @@ find_entry() {
 		[ -z "${EXEC}" ] && continue
 		# ensure entry is a Terminal Emulator
 		[ -z "${IS_TERMINAL}" ] && continue
-		# if entry lacks ExecArg
+		# if entry lacks TerminalArgExec
 		if [ "$EXECARG_DEFINED" != "true" ]; then
 			# get (custom) default in compat mode
 			if check_bool "$EXECARG_COMPAT"; then
@@ -705,13 +715,13 @@ find_entry() {
 alias find_entry='IFS= find_entry'
 
 get_default_execarg() {
-	# based on entry_id ($1) return ExecArg from EXECARG_DEFAULTS
+	# based on entry_id ($1) return TerminalArgExec from EXECARG_DEFAULTS
 	check_entry=$1
 	while IFS=':' read -r entry_id execarg_default; do
 		case "$entry_id" in
 		"$check_entry")
 			printf '%s' "$execarg_default"
-			debug "custom default ExecArg '$execarg_default' for '$check_entry'"
+			debug "custom default TerminalArgExec '$execarg_default' for '$check_entry'"
 			return 0
 			;;
 		esac
@@ -719,7 +729,7 @@ get_default_execarg() {
 		$EXECARG_DEFAULTS
 	EOF
 	printf '%s' '-e'
-	debug "using default ExecArg '-e' for '$check_entry'"
+	debug "using default TerminalArgExec '-e' for '$check_entry'"
 }
 
 ## globals
@@ -872,7 +882,7 @@ if [ -n "$HOLDARG" ] && check_bool "$HOLD"; then
 	set -- "${HOLDARG}" "$@"
 	debug "prepended $1"
 elif [ -z "$HOLDARG" ] && check_bool "$HOLD"; then
-	debug "terminal entry has no HoldArg="
+	debug "terminal entry has no TerminalArgHold="
 fi
 
 if [ -n "$DIRARG" ] && [ -n "$DIRVAL" ]; then
@@ -887,7 +897,7 @@ if [ -n "$DIRARG" ] && [ -n "$DIRVAL" ]; then
 		;;
 	esac
 elif [ -z "$DIRARG" ] && [ -n "$DIRVAL" ]; then
-	debug "terminal entry has no DirArg="
+	debug "terminal entry has no TerminalArgDir="
 fi
 
 if [ -n "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
@@ -902,7 +912,7 @@ if [ -n "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
 		;;
 	esac
 elif [ -z "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
-	debug "terminal entry has no TitleArg="
+	debug "terminal entry has no TerminalArgTitle="
 fi
 
 if [ -n "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
@@ -917,7 +927,7 @@ if [ -n "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
 		;;
 	esac
 elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -z "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
-	debug "terminal entry has no ClassArg=, falling back to AppIdArg="
+	debug "terminal entry has no TerminalArgClass=, falling back to TerminalArgAppId="
 	case "$CLASSARG" in
 	*=)
 		set -- "${APPIDARG}${CLASSVAL}" "$@"
@@ -929,9 +939,9 @@ elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -
 		;;
 	esac
 elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -n "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
-	debug "terminal entry has no ClassArg=, can not fallback to AppIdArg= is disabled since app-id option also requested"
+	debug "terminal entry has no TerminalArgClass=, can not fallback to TerminalArgAppId= is disabled since app-id option also requested"
 elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
-	debug "terminal entry has no ClassArg= and fallback to AppIdArg= is disabled"
+	debug "terminal entry has no TerminalArgClass= and fallback to TerminalArgAppId= is disabled"
 fi
 
 if [ -n "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
@@ -946,7 +956,7 @@ if [ -n "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
 		;;
 	esac
 elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -z "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
-	debug "terminal entry has no AppIdArg=, falling back to ClassArg="
+	debug "terminal entry has no TerminalArgAppId=, falling back to TerminalArgClass="
 	case "$APPIDARG" in
 	*=)
 		set -- "${CLASSARG}${APPIDVAL}" "$@"
@@ -958,9 +968,9 @@ elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -
 		;;
 	esac
 elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -n "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
-	debug "terminal entry has no AppIdArg=, can not fallback to ClassArg= since class option also requested"
+	debug "terminal entry has no TerminalArgAppId=, can not fallback to TerminalArgClass= since class option also requested"
 elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
-	debug "terminal entry has no AppIdArg= and fallback to ClassArg= is disabled"
+	debug "terminal entry has no TerminalArgAppId= and fallback to TerminalArgClass= is disabled"
 fi
 
 debug "end of option prepending"
