@@ -585,7 +585,7 @@ check_entry_key() {
 	# By default unrecognised keys, empty lines and comments get ignored
 }
 # Mask IFS withing function to allow temporary changes
-alias check_entry='IFS= check_entry'
+alias check_entry_key='IFS= check_entry_key'
 
 # Read entry from given path
 read_entry_path() {
