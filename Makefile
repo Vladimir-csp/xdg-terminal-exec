@@ -1,3 +1,4 @@
+SHELL = /bin/sh
 prefix ?= /usr/local
 exec_prefix ?= $(prefix)
 bindir ?= $(exec_prefix)/bin
@@ -6,8 +7,8 @@ mandir ?= $(datarootdir)/man
 man1dir ?= $(mandir)/man1
 
 xdg-terminal-exec.1:
-	@command -v scdoc >/dev/null || $(error Could not find scdoc in PATH, please install it) 
-	@command -v gzip >/dev/null || $(error Could not find gzip in PATH, please install it)
+	@type scdoc >/dev/null || { echo "scdoc not found in PATH" >&2; exit 127; }
+	@type gzip >/dev/null || { echo "gzip not found in PATH" >&2; exit 127; }
 	scdoc < xdg-terminal-exec.1.scd | gzip -c > xdg-terminal-exec.1.gz
 
 .PHONY: all
@@ -23,12 +24,18 @@ install-man: xdg-terminal-exec.1
 
 .PHONY: install-bin
 install-bin:
-	install -D xdg-terminal-exec -t $(bindir)
+	install -Dm755 xdg-terminal-exec -t $(bindir)
+
+.PHONY: install-conf
+install-conf:
+	install -Dm644 xdg-terminals -t $(datarootdir)/xdg-terminal-exec
 
 .PHONY: install
-install: install-man install-bin
+install: install-man install-bin install-conf
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(bindir)/xdg-terminal-exec
 	rm -f $(man1dir)/xdg-terminal-exec.1.gz
+	rm -f $(datarootdir)/xdg-terminal-exec/xdg-terminals
+	rmdir $(datarootdir)/xdg-terminal-exec/
