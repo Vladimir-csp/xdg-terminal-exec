@@ -3,6 +3,7 @@ Name=Default Terminal
 Type=Application
 Exec=echo default terminal
 Categories=TerminalEmulator;
+Actions=custom-action
 
 [Desktop Action custom-action]
 Name=Custom Action

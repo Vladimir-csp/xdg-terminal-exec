@@ -469,7 +469,10 @@ check_entry_key() {
 		debug "checking for '$action' in Actions '$value'"
 		IFS=';'
 		for check_action in $value; do
-			[ "$check_action" = "$action" ] && return 0
+			if [ "$check_action" = "$action" ]; then
+				action_listed=true
+				return 0
+			fi
 		done
 		# Default in this case is to fail
 		return 1
@@ -593,6 +596,7 @@ read_entry_path() {
 	entry_action="$2"
 	de_checks="$3"
 	read_exec=false
+	action_listed=false
 	# shellcheck disable=SC2016
 	debug "reading desktop entry '$entry_path'${entry_action:+ action '}$entry_action${entry_action:+'}"
 	# Let `read` trim leading/trailing whitespace from the line
@@ -616,7 +620,14 @@ read_entry_path() {
 			return 1
 			;;
 		# found requested action, allow reading Exec
-		"[Desktop Action ${entry_action}]"*) read_exec=true ;;
+		"[Desktop Action ${entry_action}]"*)
+			if [ "$action_listed" = "true" ]; then
+				read_exec=true
+			else
+				debug "action '$entry_action' was not listed in Actions"
+				return 1
+			fi
+			;;
 		# Start of the next group header, stop if already read exec
 		'['*) [ "$read_exec" = "true" ] && break ;;
 		esac
