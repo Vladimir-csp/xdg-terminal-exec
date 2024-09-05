@@ -7,15 +7,44 @@ shell-based implementation. The proposal PR can be found
 (!) Please be advised that while this spec is in proposed state, backwards
 compatibility is maintained as best effort and is not guaranteed.
 
-Current major change pending in this implementation: discardable options.
-(not implemented yet)
+Current v0.11.0 contains some important changes:
+  - Spec:
+    - Behavior keys and cli options.
+    - Renamed entry keys to `[X-]TerminalArg*` format.
+    - `[X-]TerminalArgExec` key is now required.
+    - Fallback management directives (`[+-]entry.desktop`)
+  - Implementation:
+    - Introduced compat and strict mode.
+    - Compat mode (currently default) continues the old behavior of the
+      implementation (optional `[X-]ExecArg`|`[X-]TerminalArgExec` with `-e`
+      default).
+    - Introduced `/execarg_default:*:*` directives for compat mode to make more
+      terminals work out of the box.
+    - Fallback management directives support.
+    - Config files fallback extended into data dirs for upstream/distro
+      defaults.
+    - Added low priority default config with fallback exclusions and execution
+      arg defaults.
+  - Build (note for packagers (!)): Added Makefile (Thanks, @quantenzitrone)
 
 # Default Terminal Execution Specification
 
-This configuration Specification is crafted in image of
-[mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest)
-and fully relies on
-[basedir-spec](https://specifications.freedesktop.org/basedir-spec/latest).
+This spec consists of three parts:
+
+1. Additional keys for the
+   [desktop-entry-spec](https://specifications.freedesktop.org/desktop-entry-spec/latest/)
+   that allow terminals to define how they are invoked.
+2. The configuration spec for defining and customizing default terminals
+   in context of Desktop Environments and user overrides. This is crafted in
+   image of
+   [mime-apps-spec](https://specifications.freedesktop.org/mime-apps-spec/latest)
+   using different config files in similar structure, governed by
+   [basedir-spec](https://specifications.freedesktop.org/basedir-spec/latest).
+3. A CLI interface to launch the configured terminal from (2) with the cli
+   options corresponding to keys from (1). Working reference implementation of
+   this CLI interface can be found here:
+     - [github.com/Vladimir-csp/xdg-terminal-exec](https://github.com/Vladimir-csp/xdg-terminal-exec/)
+     - [gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec](https://gitlab.freedesktop.org/Vladimir-csp/xdg-terminal-exec/)
 
 Terminal emulators (with their exec arguments) are described by stock Desktop
 Entries located in `applications` subdirs of XDG data hierarchy.
