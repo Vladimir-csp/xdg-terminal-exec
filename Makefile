@@ -28,7 +28,7 @@ install-bin:
 
 .PHONY: install-conf
 install-conf:
-	install -Dm644 xdg-terminals -t $(datarootdir)/xdg-terminal-exec
+	install -Dm644 xdg-terminals.list -t $(datarootdir)/xdg-terminal-exec
 
 .PHONY: install
 install: install-man install-bin install-conf
@@ -37,5 +37,5 @@ install: install-man install-bin install-conf
 uninstall:
 	rm -f $(bindir)/xdg-terminal-exec
 	rm -f $(man1dir)/xdg-terminal-exec.1.gz
-	rm -f $(datarootdir)/xdg-terminal-exec/xdg-terminals
+	rm -f $(datarootdir)/xdg-terminal-exec/xdg-terminals.list
 	rmdir $(datarootdir)/xdg-terminal-exec/

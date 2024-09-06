@@ -61,13 +61,13 @@ make_paths() {
 		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminals.list
 	done
 
-	# append xdg-termianl-exec dirs in XDG_DATA_DIRS to config hierarchy for distro/upstream level defaults
+	# append xdg-terminal-exec dirs in XDG_DATA_DIRS to config hierarchy for distro/upstream level defaults
 	for dir in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
 		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
-			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-termianl-exec/${desktop}-xdg-terminals.list
+			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminal-exec/${desktop}-xdg-terminals.list
 		done
-		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-termianl-exec/xdg-terminals.list
+		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminal-exec/xdg-terminals.list
 	done
 
 	# Populate list of directories to search for entries in, in ascending order of preference
