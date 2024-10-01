@@ -74,10 +74,8 @@ Specification is in proposed status.
 If argument expects a value and is defined as ending with `=`, value should be
 appended to the same argument without a white space.
 
-- `X-TerminalArgAppId=` - argument to set `app-id` (Wayland).
-- `X-TerminalArgClass=` - argument to set `WM_CLASS` (X11).
-- `X-TerminalArgIdFallback=` - boolean, allow fallback between `AppId` and
-  `Class` if requested one is not supported but other one is. Default: `false`
+- `X-TerminalArgAppId=` - argument to set `app-id` (Wayland) or `WM_CLASS`
+  (X11). Terminal is expected to use same argument for either backend.
 - `X-TerminalArgTitle=` - argument to set window title.
 - `X-TerminalArgDir=` - argument to set working directory.
 - `X-TerminalArgHold=` - argument to hold terminal open after requested command
@@ -195,8 +193,6 @@ Each option should be monolithic: as a single argument, value (if applicable)
 delimited by `=`. Recognized options:
 
 - `--app-id=`
-- `--class=`
-- `--id-fallback`
 - `--title=`
 - `--dir=`
 - `--hold`
