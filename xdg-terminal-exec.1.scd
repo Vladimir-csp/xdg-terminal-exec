@@ -8,7 +8,7 @@ XDG-TERMINAL-EXEC(1)
 
 # SYNOPSIS
 
-*xdg-terminal-exec* [_command_ [_arguments ..._]]
+*xdg-terminal-exec* [_options_] [--] [_command_ [_arguments ..._]]
 
 # DESCRIPTION
 
@@ -23,7 +23,8 @@ considered (*X-TerminalArgExec=* key is not required in compat mode).
 
 Command execution argument is determined by Entry's *X-TerminalArgExec=* key,
 (assumed to be *-e* by default in compat mode). If an actual *-e* or matching
-execution argument is given on the command line, it will be silently discarded.
+execution argument is given on the command line, it will be silently discarded
+along with any unsupported dashed option given before unambiguous command.
 
 It is assumed that the emulator handles command line after the execution
 argument *as is* (preserved separate arguments).
@@ -55,7 +56,16 @@ listed in _${XDG_CURRENT_DESKTOP}_. Unprefixed files parsed last in each dir.
 
 The first listed, found, and valid Desktop Entry is used.
 
-Otherwise the first found and valid Desktop Entry is used.
+Otherwise fallback to the first found and valid Desktop Entry is performed.
+
+Entries can be excluded from fallback by listing their ID prefixed with "*-*":
+
+	*-*_terminal_*.desktop*
+
+Prefixing entry with "*+*" will prevent it from later exclusion (first
+encountered directive wins):
+
+	*+*_terminal_*.desktop*
 
 Special directives understood by this implementation (the first encountered
 directive is used):
@@ -89,6 +99,10 @@ In _${XDG_CONFIG_HOME}_:
 In _${XDG_CONFIG_DIRS}_:
 - */etc/xdg/*_${desktop}_*-xdg-terminals.list*
 - */etc/xdg/xdg-terminals.list*
+
+In _${XDG_DATA_DIRS}_:
+- */usr/share/xdg-terminal-exec/*_${desktop}_*-xdg-terminals.list*
+- */usr/share/xdg-terminal-exec/xdg-terminals.list*
 
 Default directories for Desktop Entries (in order of decreasing priority):
 
