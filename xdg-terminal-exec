@@ -116,7 +116,7 @@ gen_hash() {
 }
 
 read_cache() {
-	# reads $cached_hash, $cached_exec, $cached_execarg, $cached_cmd from cache file,
+	# reads $cached_hash, $cached_cmd, $cached_exec, $cached_execarg, and others from cache file,
 	# checks if cache is actual and applies it, otherwise returns 1
 	# tries to bail out as soon as possible if something does not fit
 	if [ -f "${CACHE_FILE}" ]; then
@@ -130,10 +130,9 @@ read_cache() {
 			3_*) cached_exec=$line ;;
 			4_*) cached_execarg=$line ;;
 			5_*) cached_appidarg=$line ;;
-			6_*) cached_classarg=$line ;;
-			7_*) cached_titlearg=$line ;;
-			8_*) cached_dirarg=$line ;;
-			9_*) cached_holdarg=$line ; break ;;
+			6_*) cached_titlearg=$line ;;
+			7_*) cached_dirarg=$line ;;
+			8_*) cached_holdarg=$line ; break ;;
 			*)
 				debug "cache line ${line_num} is invalid: ${line}"
 				return 1
@@ -147,7 +146,6 @@ read_cache() {
 				"exec=${cached_exec}" \
 				"execarg=${cached_execarg}" \
 				"appidarg=${cached_appidarg}" \
-				"classarg=${cached_classarg}" \
 				"titlearg=${cached_titlearg}" \
 				"dirarg=${cached_dirarg}" \
 				"holdarg=${cached_holdarg}"
@@ -158,7 +156,6 @@ read_cache() {
 				EXEC=${cached_exec}
 				EXECARG=${cached_execarg}
 				APPIDARG=${cached_appidarg}
-				CLASSARG=${cached_classarg}
 				TITLEARG=${cached_titlearg}
 				DIRARG=${cached_dirarg}
 				HOLDARG=${cached_holdarg}
@@ -198,7 +195,6 @@ save_cache() {
 			"${EXEC}" \
 			"${EXECARG}" \
 			"${APPIDARG}" \
-			"${CLASSARG}" \
 			"${TITLEARG}" \
 			"${DIRARG}" \
 			"${HOLDARG}" > "${CACHE_FILE}"
@@ -379,7 +375,6 @@ reset_keys() {
 	EXECARG='-e'
 	EXECARG_DEFINED=false
 	APPIDARG=''
-	CLASSARG=''
 	TITLEARG=''
 	DIRARG=''
 	HOLDARG=''
@@ -534,11 +529,6 @@ check_entry_key() {
 		# Set global variable
 		APPIDARG=$value
 		debug "read TerminalArgAppId '$APPIDARG'"
-		;;
-	'X-TerminalArgClass'*=* | 'TerminalArgClass'*=*)
-		# Set global variable
-		CLASSARG=$value
-		debug "read TerminalArgClass '$CLASSARG'"
 		;;
 	'X-TerminalArgTitle'*=* | 'TerminalArgTitle'*=*)
 		# Set global variable
@@ -811,8 +801,6 @@ debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXE
 # process/discard options
 debug "option processing"
 APPIDVAL=''
-CLASSVAL=''
-IDFALLBACK=false
 TITLEVAL=''
 DIRVAL=''
 HOLD=false
@@ -834,19 +822,6 @@ while [ "$#" -gt "0" ]; do
 			$1
 		EOF
 		debug "set app-id option to $APPIDVAL"
-		shift
-		;;
-	--class=*)
-		debug "found option $1"
-		IFS='=' read -r _opt CLASSVAL <<- EOF
-			$1
-		EOF
-		debug "set class option to $CLASSVAL"
-		shift
-		;;
-	--id-fallback)
-		debug "found option $1"
-		IDFALLBACK=true
 		shift
 		;;
 	--title=*)
@@ -926,35 +901,6 @@ elif [ -z "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
 	debug "terminal entry has no TerminalArgTitle="
 fi
 
-if [ -n "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
-	case "$CLASSARG" in
-	*=)
-		set -- "${CLASSARG}${CLASSVAL}" "$@"
-		debug "prepended $1"
-		;;
-	*)
-		set -- "${CLASSARG}" "${CLASSVAL}" "$@"
-		debug "prepended $1 $2"
-		;;
-	esac
-elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -z "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
-	debug "terminal entry has no TerminalArgClass=, falling back to TerminalArgAppId="
-	case "$CLASSARG" in
-	*=)
-		set -- "${APPIDARG}${CLASSVAL}" "$@"
-		debug "prepended $1"
-		;;
-	*)
-		set -- "${APPIDARG}" "${CLASSVAL}" "$@"
-		debug "prepended $1 $2"
-		;;
-	esac
-elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ] && check_bool "$IDFALLBACK" && [ -n "$APPIDVAL" ] && [ -n "$APPIDARG" ]; then
-	debug "terminal entry has no TerminalArgClass=, can not fallback to TerminalArgAppId= is disabled since app-id option also requested"
-elif [ -z "$CLASSARG" ] && [ -n "$CLASSVAL" ]; then
-	debug "terminal entry has no TerminalArgClass= and fallback to TerminalArgAppId= is disabled"
-fi
-
 if [ -n "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
 	case "$APPIDARG" in
 	*=)
@@ -966,22 +912,8 @@ if [ -n "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
 		debug "prepended $1 $2"
 		;;
 	esac
-elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -z "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
-	debug "terminal entry has no TerminalArgAppId=, falling back to TerminalArgClass="
-	case "$APPIDARG" in
-	*=)
-		set -- "${CLASSARG}${APPIDVAL}" "$@"
-		debug "prepended $1"
-		;;
-	*)
-		set -- "${CLASSARG}" "${APPIDVAL}" "$@"
-		debug "prepended $1 $2"
-		;;
-	esac
-elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ] && check_bool "$IDFALLBACK" && [ -n "$CLASSVAL" ] && [ -n "$CLASSARG" ]; then
-	debug "terminal entry has no TerminalArgAppId=, can not fallback to TerminalArgClass= since class option also requested"
 elif [ -z "$APPIDARG" ] && [ -n "$APPIDVAL" ]; then
-	debug "terminal entry has no TerminalArgAppId= and fallback to TerminalArgClass= is disabled"
+	debug "terminal entry has no TerminalArgAppId="
 fi
 
 debug "end of option prepending"
