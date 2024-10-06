@@ -206,8 +206,13 @@ newline'
 	assert_success
 	assert_output <<-'EOF'
 		|||quoting terminal|||
-		|||with 'complex' arguments|||
-		|||and \"back\\slashes\"|||
+		|||with 'complex' arguments,|||
+		|||quotes ",|||
+		||||||
+		|||empty args,|||
+		|||new
+		lines,|||
+		|||and "back\slashes"|||
 		|||-e|||
 		|||and|||
 		|||custom arguments|||

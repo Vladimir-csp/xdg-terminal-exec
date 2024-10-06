@@ -1,5 +1,5 @@
 [Desktop Entry]
 Name=Default Terminal
 Type=Application
-Exec=printf '|||%s|||\n' quoting\ terminal "with 'complex' arguments" 'and \"back\\slashes\"'
+Exec=printf "|||%%s|||\\\\n" "quoting terminal" "with 'complex' arguments," "quotes \\"," "" 	"empty args," "new\nlines," "and \\"back\\\\slashes\\""
 Categories=TerminalEmulator;
