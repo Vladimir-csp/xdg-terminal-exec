@@ -27,8 +27,19 @@ OIFS="$IFS"
 N='
 '
 
-# Utility function to print messages to stderr
-error() { printf '%s\n' "$@" >&2; }
+# name of executable
+SELF_NAME=${0##*/}
+
+# ASCII Record Separator for cache saving
+RSEP=$(printf '%b' '\036')
+
+# ASCII Unit Separator for Exec parsing
+USEP=$(printf '%b' '\037')
+
+error() {
+	# Print messages to stderr
+	printf '%s\n' "$@" >&2
+}
 
 check_bool() {
 	case "$1" in
@@ -86,13 +97,15 @@ make_paths() {
 alias make_paths='IFS= make_paths'
 
 gen_hash() {
-	# return md5 of XDG_CURRENT DESKTOP and ls -LRl output for config and data paths
+	# return md5 of custom string, XDG_CURRENT_DESKTOP and ls -LRl output for config and data paths
 	# md5 is 4x faster than sha*, and there is no need for cryptography here
 	# shellcheck disable=SC2034
-	read -r hash drop <<- EOH
+	read -r hash _drop <<- EOH
 		$(
 			hash_paths="${CONFIGS}:${APPLICATIONS_DIRS}"
 			{
+				# cache 'version', change to invalidate when format changes
+				echo 3
 				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
 				# shellcheck disable=SC2086
@@ -116,44 +129,58 @@ gen_hash() {
 }
 
 read_cache() {
-	# reads $cached_hash, $cached_cmd, $cached_exec, $cached_execarg, and others from cache file,
+	# reads $cached_hash, $cached_cmd, $cached_exec_usep, $cached_execarg, and others from cache file,
 	# checks if cache is actual and applies it, otherwise returns 1
 	# tries to bail out as soon as possible if something does not fit
 	if [ -f "${CACHE_FILE}" ]; then
-		IFS=${N}
 		line_num=0
-		while read -r line; do
+		line_limit=50
+		cached_exec_usep=
+		finished=0
+		while IFS='' read -r line; do
 			line_num=$((line_num + 1))
-			case "${line_num}_${line}" in
-			1_[0-9a-f]??????????????????????????????[0-9a-f]) cached_hash=$line ;;
-			2_*) cached_cmd=$line ;;
-			3_*) cached_exec=$line ;;
-			4_*) cached_execarg=$line ;;
-			5_*) cached_appidarg=$line ;;
-			6_*) cached_titlearg=$line ;;
-			7_*) cached_dirarg=$line ;;
-			8_*) cached_holdarg=$line ; break ;;
-			*)
-				debug "cache line ${line_num} is invalid: ${line}"
+			case "${line_num}" in
+			1) cached_hash=$line ;;
+			2) cached_cmd=$line ;;
+			3) cached_execarg=$line ;;
+			4) cached_appidarg=$line ;;
+			5) cached_titlearg=$line ;;
+			6) cached_dirarg=$line ;;
+			7) cached_holdarg=$line ;;
+			"$line_limit")
+				debug "reached cache line limit ($line_limit)"
 				return 1
+				;;
+			# Line 8 starts command
+			*)
+				# Command is stored as raw expanded and tokenized $USEP-separated command,
+				# technically it can contain newline characters.
+				# Reconstruct newlines, use ${RSEP}END_OF_EXEC_USEP string as terminator.
+				cached_exec_usep=${cached_exec_usep}${cached_exec_usep:+$N}${line}
+				case "${line}" in
+				*"${RSEP}END_OF_EXEC_USEP")
+					cached_exec_usep=${cached_exec_usep%"${RSEP}END_OF_EXEC_USEP"}
+					finished=1
+					break
+					;;
+				esac
 				;;
 			esac
 		done < "${CACHE_FILE}"
-		if [ "$line_num" = "9" ]; then
+		if [ "$finished" = "1" ]; then
 			debug "got cache:" \
 				"hash=${cached_hash}" \
 				"cmd=${cached_cmd}" \
-				"exec=${cached_exec}" \
 				"execarg=${cached_execarg}" \
 				"appidarg=${cached_appidarg}" \
 				"titlearg=${cached_titlearg}" \
 				"dirarg=${cached_dirarg}" \
-				"holdarg=${cached_holdarg}"
-			IFS=$OIFS
+				"holdarg=${cached_holdarg}" \
+				"exec_usep=${cached_exec_usep}"
 			HASH=$(gen_hash) || return 1
 			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
 				debug "cache is actual"
-				EXEC=${cached_exec}
+				EXEC_USEP=${cached_exec_usep}
 				EXECARG=${cached_execarg}
 				APPIDARG=${cached_appidarg}
 				TITLEARG=${cached_titlearg}
@@ -173,33 +200,38 @@ read_cache() {
 		return 1
 	fi
 }
-# Mask IFS withing function to allow temporary changes
-alias read_cache='IFS= read_cache'
 
 save_cache() {
-	# saves $HASH, $1 (executable), $EXEC, $EXECARG, other supported args to cache file or removes it if CACHE_ENABLED is false
+	# saves $HASH, $1 (executable), $EXEC_USEP, $EXECARG, other supported args to cache file or removes it if CACHE_ENABLED is false
 	if check_bool "$CACHE_ENABLED"; then
 		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
 		if [ -z "${HASH-}" ]; then
 			HASH=$(gen_hash) || {
-				echo "could not hash listing, removing '${CACHE_FILE}'" >&2
+				error "could not hash listing of files, removing '${CACHE_FILE}'"
 				rm -f "${CACHE_FILE}"
 				return 0
 			}
 		fi
+		case "${HASH}${1}${EXECARG}${APPIDARG}${TITLEARG}${DIRARG}${HOLDARG}" in
+		"$N")
+			error "One or more of terminal's arguments contains a newline, removing '${CACHE_FILE}'"
+			rm -f "${CACHE_FILE}"
+			return 0
+			;;
+		esac
 		UM=$(umask)
 		umask 0077
 		printf '%s\n' \
 			"${HASH}" \
 			"${1}" \
-			"${EXEC}" \
 			"${EXECARG}" \
 			"${APPIDARG}" \
 			"${TITLEARG}" \
 			"${DIRARG}" \
-			"${HOLDARG}" > "${CACHE_FILE}"
+			"${HOLDARG}" \
+			"${EXEC_USEP}${RSEP}END_OF_EXEC_USEP" > "${CACHE_FILE}"
 		umask "$UM"
-		debug ">     saved cache:" "${HASH}" "${EXEC}" "${EXECARG}" "${1}" "^     end of saved cache"
+		debug ">     saved cache:" "${HASH}" "${EXEC_USEP}" "${EXECARG}" "${1}" "^     end of saved cache"
 	else
 		debug "cache is disabled, removing '${CACHE_FILE}'"
 		rm -f "${CACHE_FILE}"
@@ -339,39 +371,273 @@ read_config_paths() {
 alias read_config_paths='IFS= read_config_paths'
 
 replace() {
-	# takes $1, finds $2, replaces with $3
+	# takes $1, replaces $2 with $3
 	# does it in large chunks
+	# writes result to global REPLACED_STR to avoid $() newline issues
 
-	# var to be modified
-	string=${1}
 	# right part of string
-	r_string=${1}
-	# left part of string
-	l_string=''
-	# previous right part of string
-	prev_r_string=''
-	while true; do
-		# save previous r_string
-		prev_r_string=${r_string}
-		# cut the right part with search string from the left
-		r_string=${r_string#*"${2}"}
-		# cut the left part with search string and rigth part from the right
-		l_string=${string%"${2}${r_string}"}
-		case "$r_string" in
-		# if the right part was not unmodified, there is nothing to replace
-		"$prev_r_string") break ;;
-		# if the right part was is modified, update string with:
-		# the left part, replace string, the right part
-		*) string=${l_string}${3}${r_string} ;;
+	r_remainder=${1}
+	REPLACED_STR=
+	while [ -n "$r_remainder" ]; do
+		# left part before first encounter of $2
+		r_left=${r_remainder%%"$2"*}
+		# append
+		REPLACED_STR=${REPLACED_STR}$r_left
+		if [ "$r_left" = "$r_remainder" ]; then
+			# nothing left to cut
+			break
+		fi
+		# append replace substring
+		REPLACED_STR=${REPLACED_STR}$3
+		# cut remainder
+		r_remainder=${r_remainder#*"$2"}
+	done
+}
+
+de_expand_str() {
+	# expands \s, \n, \t, \r, \\
+	# https://specifications.freedesktop.org/desktop-entry-spec/latest/value-types.html
+	# writes result to global $EXPANDED_STR in place to avoid $() expansion newline issues
+	debug "expander received: $1"
+	EXPANDED_STR=
+	exp_remainder=$1
+	while [ -n "$exp_remainder" ]; do
+		# left is substring of remainder before the first encountered backslash
+		exp_left=${exp_remainder%%\\*}
+
+		# append left to EXPANDED_STR
+		EXPANDED_STR=${EXPANDED_STR}${exp_left}
+		debug "expander appended: $exp_left"
+
+		if [ "$exp_left" = "$exp_remainder" ]; then
+			debug "expander ended: $EXPANDED_STR"
+			# no more backslashes left
+			break
+		fi
+
+		# remove left substring and backslash from remainder
+		exp_remainder=${exp_remainder#"$exp_left"\\}
+
+		case "$exp_remainder" in
+		# expand and append to EXPANDED_STR
+		s*)
+			EXPANDED_STR=${EXPANDED_STR}' '
+			exp_remainder=${exp_remainder#?}
+			debug "expander substituted space"
+			;;
+		n*)
+			EXPANDED_STR=${EXPANDED_STR}$N
+			exp_remainder=${exp_remainder#?}
+			debug "expander substituted newline"
+			;;
+		t*)
+			EXPANDED_STR=${EXPANDED_STR}'	'
+			exp_remainder=${exp_remainder#?}
+			debug "expander substituted tab"
+			;;
+		r*)
+			EXPANDED_STR=${EXPANDED_STR}$(printf '%b' '\r')
+			exp_remainder=${exp_remainder#?}
+			debug "expander substituted caret return"
+			;;
+		\\*)
+			EXPANDED_STR=${EXPANDED_STR}\\
+			exp_remainder=${exp_remainder#?}
+			debug "expander substituted backslash"
+			;;
+		# unsupported sequence, reappend backslash
+		#*)
+		#	EXPANDED_STR=${EXPANDED_STR}\\
+		#	debug 'expander reappended backslash'
+		#	;;
 		esac
 	done
-	echo "$string"
 }
+
+de_tokenize_exec() {
+	# Shell-based DE Exec string tokenizer.
+	# https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html
+	# How hard can it be?
+	# Fills global EXEC_USEP var with $USEP-separated command array in place to avoid $() expansion newline issues
+	debug "tokenizer received: $1"
+	EXEC_USEP=
+	tok_remainder=$1
+	tok_quoted=0
+	tok_in_space=0
+	while [ -n "$tok_remainder" ]; do
+		# left is substring of remainder before the first encountered special char
+		tok_left=${tok_remainder%%[[:space:]\"\`\$\\\'\>\<\~\|\&\;\*\?\#\(\)]*}
+
+		# left should be safe to append right away
+		EXEC_USEP=${EXEC_USEP}${tok_left}
+		debug "tokenizer appended: >$tok_left<"
+
+		# end of the line
+		case "$tok_remainder" in
+		"$tok_left")
+			debug "tokenizer is out of special chars"
+			break
+			;;
+		esac
+
+		# isolate special char
+		tok_remainder=${tok_remainder#"$tok_left"}
+		cut=${tok_remainder#?}
+		tok_char=${tok_remainder%"$cut"}
+		unset cut
+		# cut it from remainder
+		tok_remainder=${tok_remainder#"$tok_char"}
+
+		# check if still in space
+		case "${tok_in_space}${tok_left}${tok_char}" in
+		1[[:space:]])
+			debug "tokenizer still in space :) skipping space character"
+			continue
+			;;
+		1*)
+			debug "tokenizer no longer in space :("
+			tok_in_space=0
+			;;
+		esac
+
+		## decide what to do with the character
+		# doublequote while quoted
+		case "${tok_quoted}${tok_char}" in
+		'1"')
+			tok_quoted=0
+			debug "tokenizer closed double quotes"
+			continue
+			;;
+		# doublequote while unquoted
+		'0"')
+			tok_quoted=1
+			debug "tokenizer opened double quotes"
+			continue
+			;;
+		# error out on unquoted special chars
+		0[\`\$\\\'\>\<\~\|\&\;\*\?\#\(\)])
+			debug "${entry_id}: Encountered unquoted character: '$tok_char'"
+			return 1
+			;;
+		# error out on quoted but unescaped chars
+		1[\`\$])
+			debug "${entry_id}: Encountered unescaped quoted character: '$tok_char'"
+			return 1
+			;;
+		# process quoted escapes
+		1\\)
+			case "$tok_remainder" in
+			# if there is no next char, fail
+			'')
+				debug "${entry_id}: Dangling backslash encountered!"
+				return 1
+				;;
+			# cut and append the next char right away
+			# or a half of multibyte char, the other half should go into the next
+			# 'tok_left' hopefully...
+			*)
+				cut=${tok_remainder#?}
+				tok_char=${tok_remainder%"$cut"}
+				tok_remainder=${cut}
+				unset cut
+				EXEC_USEP=${EXEC_USEP}${tok_char}
+				debug "tokenizer appended escaped: >$tok_char<"
+				;;
+			esac
+			;;
+		# Consider Cosmos
+		0[[:space:]])
+			case "${tok_remainder}" in
+			# there is non-space to follow
+			*[![:space:]]*)
+				# append separator
+				EXEC_USEP=${EXEC_USEP}${USEP}
+				tok_in_space=1
+				debug "tokenizer entered spaaaaaace!!!! separator appended"
+				;;
+			# ignore unquoted space at the end of string
+			*)
+				debug "tokenizer entered outer spaaaaaace!!!! separator skipped, this is the end"
+				break
+				;;
+			esac
+			;;
+		# append quoted chars
+		1[[:space:]\'\>\<\~\|\&\;\*\?\#\(\)])
+			EXEC_USEP=${EXEC_USEP}${tok_char}
+			debug "tokenizer appended quoted char: >$tok_char<"
+			;;
+		# this should not happen
+		*)
+			debug "${entry_id}: parsing error at char '$tok_char', (quoted: $tok_quoted)"
+			return 1
+			;;
+		esac
+	done
+	case "$tok_quoted" in
+	1)
+		debug "${entry_id}: Double quote was not closed!"
+		return 1
+		;;
+	esac
+	# shellcheck disable=SC2086
+	debug "tokenizer ended:" "$(IFS=$USEP; printf 'D:     >%s<\n' $EXEC_USEP)"
+}
+
+de_strip_fields() {
+	# Operates on $EXEC_USEP
+	# modifies according to args/fields
+	# no arguments, erase fields from $EXEC_USEP
+	exec_usep=''
+	fu_found=false
+	IFS=$USEP
+	for arg in $EXEC_USEP; do
+		case "$arg" in
+		# remove deprecated fields
+		*[!%]'%'[dDnNvm]* | '%'[dDnNvm]*) debug "injector removed deprecated '$arg'" ;;
+		# treat file fields
+		*[!%]'%'[fFuU]* | '%'[fFuU]*)
+			if [ "$fu_found" = "true" ]; then
+				debug "${entry_id}: Encountered more than one %[fFuU] field!"
+				return 1
+			fi
+			fu_found=true
+			debug "injector removed '$arg'"
+			continue
+			;;
+		# other fields
+		*[!%]'%i'* | '%i'* | *[!%]'%c'* | '%c'*)
+			debug "injector removed '$arg'"
+			continue
+			;;
+		# literal %
+		*[!%]%%* | %%*)
+			replace "$arg" "%%" "%"
+			rarg=$REPLACED_STR
+			debug "injector replacing '%%': '$arg' -> '$rarg'"
+			exec_usep=${exec_usep}${exec_usep:+$USEP}${rarg}
+			;;
+		# invalid field
+		*%?* | *[!%]%)
+			debug "${entry_id}: unknown % field in argument '${arg}'"
+			return 1
+			;;
+		*)
+			debug "injector keeped: '$arg'"
+			exec_usep=${exec_usep}${exec_usep:+$USEP}${arg}
+			;;
+		esac
+	done
+	EXEC_USEP=$exec_usep
+	IFS=$OIFS
+}
+# Mask IFS withing function to allow temporary changes
+alias de_strip_fields='IFS= de_strip_fields'
 
 reset_keys() {
 	# init vars used in entry checks
 	IS_TERMINAL=''
-	EXEC=''
+	EXEC_USEP=''
 	EXECARG='-e'
 	EXECARG_DEFINED=false
 	APPIDARG=''
@@ -432,7 +698,7 @@ alias find_entry_paths='IFS= find_entry_paths'
 
 # Check validity of a given entry key - value pair
 # Modifies following global variables:
-# EXEC : Program to execute, possibly with arguments. See spec for details.
+# EXEC_USEP : Program to execute, possibly with arguments, delimited by ASCII Unit Separator.
 # EXECARG : Execution argument for the terminal emulator.
 # IS_TERMINAL : Set if application has been categorized as a terminal emulator
 check_entry_key() {
@@ -511,7 +777,9 @@ check_entry_key() {
 		;;
 	'X-TerminalArgExec'*=* | 'TerminalArgExec'*=*)
 		# Set global variable
-		EXECARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		EXECARG=$EXPANDED_STR
 		EXECARG_DEFINED=true
 		debug "read TerminalArgExec '$EXECARG'"
 		;;
@@ -521,33 +789,44 @@ check_entry_key() {
 		false) return 0 ;;
 		esac
 		# Set global variable
-		EXECARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		EXECARG=$EXPANDED_STR
 		EXECARG_DEFINED=true
 		debug "read TerminalArgExec '$EXECARG'"
 		;;
 	'X-TerminalArgAppId'*=* | 'TerminalArgAppId'*=*)
 		# Set global variable
-		APPIDARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		APPIDARG=$EXPANDED_STR
 		debug "read TerminalArgAppId '$APPIDARG'"
 		;;
 	'X-TerminalArgTitle'*=* | 'TerminalArgTitle'*=*)
 		# Set global variable
-		TITLEARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		TITLEARG=$EXPANDED_STR
 		debug "read TerminalArgTitle '$TITLEARG'"
 		;;
 	'X-TerminalArgDir'*=* | 'TerminalArgDir'*=*)
 		# Set global variable
-		DIRARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		DIRARG=$EXPANDED_STR
 		debug "read TerminalArgDir '$DIRARG'"
 		;;
 	'X-TerminalArgHold'*=* | 'TerminalArgHold'*=*)
 		# Set global variable
-		HOLDARG=$value
+		# values of type string should support escape sequences
+		de_expand_str "$value"
+		HOLDARG=$EXPANDED_STR
 		debug "read TerminalArgHold '$HOLDARG'"
 		;;
 	'TryExec'*=*)
-		debug "checking TryExec executable '$value'"
-		command -v "$value" > /dev/null || return 1
+		de_expand_str "$value"
+		debug "checking TryExec executable '$EXPANDED_STR'"
+		command -v "$(printf '%b' "$EXPANDED_STR")" > /dev/null || return 1
 		;;
 	'Hidden'*=*)
 		debug "checking boolean Hidden '$value'"
@@ -566,13 +845,16 @@ check_entry_key() {
 			;;
 		esac
 		debug "read Exec '$value'"
-		# Set global variable
-		EXEC=$value
+		# Escape sequences of DE string value (sets $EXPANDED_STR)
+		de_expand_str "$value"
+		# Tokenize resulting string (sets $EXEC_USEP)
+		de_tokenize_exec "$EXPANDED_STR"
+		# Expand % fields
+		de_strip_fields
 		# Get first word from read Exec value
-		IFS="$OIFS"
-		eval "set -- $EXEC"
-		debug "checking Exec[0] executable '$1'"
-		command -v "$1" > /dev/null || return 1
+		EXEC0=${EXEC_USEP%%"$USEP"*}
+		debug "checking Exec[0] executable '$EXEC0'"
+		command -v "$EXEC0" > /dev/null || return 1
 		;;
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
@@ -692,7 +974,7 @@ find_entry() {
 		unalias "$entry_id"
 		read_entry_path "$entry_path" "$entry_action" "$de_checks" || continue
 		# Check that the entry is actually executable
-		[ -z "${EXEC}" ] && continue
+		[ -z "${EXEC_USEP}" ] && continue
 		# ensure entry is a Terminal Emulator
 		[ -z "${IS_TERMINAL}" ] && continue
 		# if entry lacks TerminalArgExec
@@ -734,12 +1016,15 @@ get_default_execarg() {
 }
 
 ## globals
-LOWERCASE_XDG_CURRENT_DESKTOP=$(echo "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
+LOWERCASE_XDG_CURRENT_DESKTOP=$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
 
 # compat mode
 EXECARG_COMPAT=${XTE_EXECARG_COMPAT-true}
 # flag reused in directive encounter
 EXECARG_COMPAT_CONFIGURED=${XTE_EXECARG_COMPAT-}
+
+EXEC_USEP=''
+EXPANDED_STR=''
 
 # this will receive proper value later
 APPLICATIONS_DIRS=''
@@ -796,7 +1081,7 @@ else
 fi
 
 # Store original argument list, before it's modified
-debug ">     original args:" "$@" "^     end of original args" "EXEC=$EXEC" "EXECARG=$EXECARG"
+debug ">     original args:" "$@" "^     end of original args" "EXEC_USEP=$EXEC_USEP" "EXECARG=$EXECARG"
 
 # process/discard options
 debug "option processing"
@@ -918,8 +1203,11 @@ fi
 
 debug "end of option prepending"
 
-# `Implementations must undo quoting [in the Exec argument(s)][...]`
-eval "set -- $EXEC \"\$@\""
+# prepend Exec
+IFS=$USEP
+# shellcheck disable=SC2086
+set -- $EXEC_USEP "$@"
+IFS=$OIFS
 
 debug ">     final args:" "$@" "^     end of final args"
 
