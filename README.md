@@ -285,3 +285,16 @@ and the var was later removed, the script will not know that the cache is
 disabled until one of three things happens: cache file is removed, something
 invalidates it (like touching/editing a config/entry), or a run with falsy
 `XTE_CACHE_ENABLED` is performed.
+
+### Exec command parsing, escape sequences.
+
+Strings in Desktop Entries have a
+[set of escape sequences](https://specifications.freedesktop.org/desktop-entry-spec/latest/value-types.html)
+to be expanded. On top of that, each arg in `Exec` key is
+[expected](https://specifications.freedesktop.org/desktop-entry-spec/latest/exec-variables.html)
+to have them too, along with other special characters. This means escape
+sequences in `Exec` are expected to be expanded twice: in string value, then
+in argument "dequoting".
+
+This implementaton now does proper expansion and dequoting. It will invalidate
+entries that fail those rules.
