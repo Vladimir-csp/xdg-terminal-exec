@@ -581,7 +581,10 @@ de_tokenize_exec() {
 		;;
 	esac
 	# shellcheck disable=SC2086
-	debug "tokenizer ended:" "$(IFS=$USEP; printf 'D:     >%s<\n' $EXEC_USEP)"
+	debug "tokenizer ended:" "$(
+		IFS=$USEP
+		printf 'D:     >%s<\n' $EXEC_USEP
+	)"
 }
 
 de_strip_fields() {
@@ -1089,6 +1092,7 @@ APPIDVAL=''
 TITLEVAL=''
 DIRVAL=''
 HOLD=false
+TEST_MODE=false
 while [ "$#" -gt "0" ]; do
 	case "$1" in
 	--)
@@ -1129,6 +1133,12 @@ while [ "$#" -gt "0" ]; do
 		debug "found option $1"
 		HOLD=true
 		debug "set HOLD=true"
+		shift
+		;;
+	--test)
+		debug "found option $1"
+		TEST_MODE=true
+		debug "set TEST_MODE=true"
 		shift
 		;;
 	[!-]*)
@@ -1215,5 +1225,13 @@ if [ "$CACHE_USED" = "false" ]; then
 	# saves or removes cache, forked out of the way
 	save_cache "$1" &
 fi
+
+case "$TEST_MODE" in
+true)
+	printf '%s\n' 'Command and arguments:'
+	printf '  >%s<\n' "$@"
+	exit 0
+	;;
+esac
 
 exec "$@"
