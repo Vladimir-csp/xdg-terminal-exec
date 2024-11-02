@@ -7,7 +7,10 @@ shell-based implementation. The proposal PR can be found
 (!) Please be advised that while this spec is in proposed state, backwards
 compatibility is maintained as best effort and is not guaranteed.
 
-Current v0.11.0 contains some important changes:
+Since v0.12.0 Desktop entry string keys and Exec are handled (expanded and
+dequoted) strictly according to Desktop Entry Spec.
+
+v0.11.0 introduced some important changes:
   - Spec:
     - Behavior keys and cli options.
     - Renamed entry keys to `[X-]TerminalArg*` format.
@@ -296,5 +299,5 @@ to have them too, along with other special characters. This means escape
 sequences in `Exec` are expected to be expanded twice: in string value, then
 in argument "dequoting".
 
-This implementaton now does proper expansion and dequoting. It will invalidate
-entries that fail those rules.
+This implementaton now does proper expansion, dequoting and command
+tokenization. It will invalidate entries that fail those rules.
