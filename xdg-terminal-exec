@@ -1181,7 +1181,7 @@ elif [ -z "$DIRARG" ] && [ -n "$DIRVAL" ]; then
 	debug "terminal entry has no TerminalArgDir="
 fi
 
-if [ -n "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
+if [ -n "$TITLEARG" ] && [ -n "$TITLEVAL" ]; then
 	case "$TITLEARG" in
 	*=)
 		set -- "${TITLEARG}${TITLEVAL}" "$@"
@@ -1192,7 +1192,7 @@ if [ -n "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
 		debug "prepended $1 $2"
 		;;
 	esac
-elif [ -z "$HOLDARG" ] && [ -n "$TITLEVAL" ]; then
+elif [ -z "$TITLEARG" ] && [ -n "$TITLEVAL" ]; then
 	debug "terminal entry has no TerminalArgTitle="
 fi
 
