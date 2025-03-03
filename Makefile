@@ -39,3 +39,8 @@ uninstall:
 	rm -f $(man1dir)/xdg-terminal-exec.1.gz
 	rm -f $(datarootdir)/xdg-terminal-exec/xdg-terminals.list
 	rmdir $(datarootdir)/xdg-terminal-exec/
+
+.PHONY: test
+test:
+	@type bats >/dev/null || { echo "bats not found in PATH" >&2; exit 127; }
+	test/tests.bats
