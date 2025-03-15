@@ -20,15 +20,15 @@ clean:
 
 .PHONY: install-man
 install-man: xdg-terminal-exec.1
-	install -Dm644 xdg-terminal-exec.1.gz -t $(man1dir)
+	install -Dpm644 xdg-terminal-exec.1.gz -t $(man1dir)
 
 .PHONY: install-bin
 install-bin:
-	install -Dm755 xdg-terminal-exec -t $(bindir)
+	install -Dpm755 xdg-terminal-exec -t $(bindir)
 
 .PHONY: install-conf
 install-conf:
-	install -Dm644 xdg-terminals.list -t $(datarootdir)/xdg-terminal-exec
+	install -Dpm644 xdg-terminals.list -t $(datarootdir)/xdg-terminal-exec
 
 .PHONY: install
 install: install-man install-bin install-conf
