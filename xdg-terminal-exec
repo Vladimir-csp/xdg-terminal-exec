@@ -1118,7 +1118,7 @@ while [ "$#" -gt "0" ]; do
 		IFS='=' read -r _opt TITLEVAL <<- EOF
 			$1
 		EOF
-		debug "set title option to $DIRVAL"
+		debug "set title option to $TITLEVAL"
 		shift
 		;;
 	--dir=*)
