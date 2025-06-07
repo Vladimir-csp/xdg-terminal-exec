@@ -193,7 +193,9 @@ or any matching execution argument. Option processing should end on `--`, `-e`,
 or matching execution argument.
 
 Each option should be monolithic: as a single argument, value (if applicable)
-delimited by `=`. Recognized options:
+delimited by `=`.
+
+### Options for modifying terminal's behavior
 
 - `--app-id=`
 - `--title=`
@@ -210,6 +212,24 @@ is appended as the next argument.
 Next the command and arguments are passed as is.
 
 The resulting command is executed without forking.
+
+### Options for returning data instead of executing terminal
+
+- `--print-id`: print selected Desktop Entry ID. Action is appended delimited
+  by `:`.
+- `--print-path`: print absolute path to selected Desktop Entry. Action is
+  appended delimited by `:`.
+- `--print-content`: print content of selected Desktop Entry. Conflicts with
+  `--print-cmd`.
+- `--print-cmd[=printf_sequence]`: print resulting command line, delimited by
+  given printf sequence, `\n` by default. If sequence is `\n`, output is also
+  terminated with newline. Conflicts with `--print-content`.
+
+Depending on selected data options, data is returned in the following order:
+
+- id
+- path
+- content or cmd
 
 ## Limitations and compliance of terminals
 
