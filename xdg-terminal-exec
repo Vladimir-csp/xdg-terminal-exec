@@ -105,7 +105,7 @@ gen_hash() {
 			hash_paths="${CONFIGS}:${APPLICATIONS_DIRS}"
 			{
 				# cache 'version', change to invalidate when format changes
-				echo 3
+				echo 4
 				echo "${XDG_CURRENT_DESKTOP-}"
 				IFS=':'
 				# shellcheck disable=SC2086
@@ -142,16 +142,19 @@ read_cache() {
 			case "${line_num}" in
 			1) cached_hash=$line ;;
 			2) cached_cmd=$line ;;
-			3) cached_execarg=$line ;;
-			4) cached_appidarg=$line ;;
-			5) cached_titlearg=$line ;;
-			6) cached_dirarg=$line ;;
-			7) cached_holdarg=$line ;;
+			3) cached_entry_path=$line ;;
+			4) cached_entry_id=$line ;;
+			5) cached_entry_action=$line ;;
+			6) cached_execarg=$line ;;
+			7) cached_appidarg=$line ;;
+			8) cached_titlearg=$line ;;
+			9) cached_dirarg=$line ;;
+			10) cached_holdarg=$line ;;
 			"$line_limit")
 				debug "reached cache line limit ($line_limit)"
 				return 1
 				;;
-			# Line 8 starts command
+			# Line 11 starts command
 			*)
 				# Command is stored as raw expanded and tokenized $USEP-separated command,
 				# technically it can contain newline characters.
@@ -171,6 +174,9 @@ read_cache() {
 			debug "got cache:" \
 				"hash=${cached_hash}" \
 				"cmd=${cached_cmd}" \
+				"entry_path=${cached_entry_path}" \
+				"entry_id=${cached_entry_id}" \
+				"entry_action=${cached_entry_action}" \
 				"execarg=${cached_execarg}" \
 				"appidarg=${cached_appidarg}" \
 				"titlearg=${cached_titlearg}" \
@@ -181,6 +187,9 @@ read_cache() {
 			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
 				debug "cache is actual"
 				EXEC_USEP=${cached_exec_usep}
+				ENTRY_PATH=${cached_entry_path}
+				ENTRY_ID=${cached_entry_id}
+				ENTRY_ACTION=${cached_entry_action}
 				EXECARG=${cached_execarg}
 				APPIDARG=${cached_appidarg}
 				TITLEARG=${cached_titlearg}
@@ -224,6 +233,9 @@ save_cache() {
 		printf '%s\n' \
 			"${HASH}" \
 			"${1}" \
+			"${ENTRY_PATH}" \
+			"${ENTRY_ID}" \
+			"${ENTRY_ACTION}" \
 			"${EXECARG}" \
 			"${APPIDARG}" \
 			"${TITLEARG}" \
@@ -990,7 +1002,10 @@ find_entry() {
 				continue
 			fi
 		fi
-		# Entry is valid, stop
+		# Entry is valid, set ENTRY_PATH, ENTRY_ID, ENTRY_ACTION and stop
+		ENTRY_PATH=$entry_path
+		ENTRY_ID=$entry_id
+		ENTRY_ACTION=$entry_action
 		return 0
 	done
 	# shellcheck disable=SC2086
@@ -1028,6 +1043,9 @@ EXECARG_COMPAT_CONFIGURED=${XTE_EXECARG_COMPAT-}
 
 EXEC_USEP=''
 EXPANDED_STR=''
+ENTRY_PATH=''
+ENTRY_ID=''
+ENTRY_ACTION=''
 
 # this will receive proper value later
 APPLICATIONS_DIRS=''
@@ -1093,6 +1111,7 @@ TITLEVAL=''
 DIRVAL=''
 HOLD=false
 TEST_MODE=false
+PRINT_DATA=
 while [ "$#" -gt "0" ]; do
 	case "$1" in
 	--)
@@ -1141,6 +1160,46 @@ while [ "$#" -gt "0" ]; do
 		debug "set TEST_MODE=true"
 		shift
 		;;
+	--print-path)
+		debug "found option $1"
+		PRINT_DATA="$PRINT_DATA path"
+		debug "set PRINT_DATA='$PRINT_DATA'"
+		shift
+		;;
+	--print-id)
+		debug "found option $1"
+		PRINT_DATA="$PRINT_DATA id"
+		debug "set PRINT_DATA=$PRINT_DATA"
+		shift
+		;;
+	--print-content)
+		debug "found option $1"
+		case " $PRINT_DATA " in
+		*" cmd "*)
+			error "'--print-content' is incompatible with '--print-cmd'!"
+			exit 1
+			;;
+		esac
+		PRINT_DATA="$PRINT_DATA content"
+		debug "set PRINT_DATA=$PRINT_DATA"
+		shift
+		;;
+	--print-cmd | --print-cmd=*)
+		debug "found option $1"
+		case " $PRINT_DATA " in
+		*" content "*)
+			error "'--print-cmd' is incompatible with '--print-content'!"
+			exit 1
+			;;
+		esac
+		PRINT_DATA="$PRINT_DATA cmd"
+		IFS='=' read -r _arg PRINT_DELIMITER <<- EOF
+			$1
+		EOF
+		PRINT_DELIMITER=${PRINT_DELIMITER:-'\n'}
+		debug "set PRINT_DATA=$PRINT_DATA" "set PRINT_DELIMITER=$PRINT_DELIMITER"
+		shift
+		;;
 	[!-]*)
 		debug "found non-option $1"
 		break
@@ -1152,6 +1211,38 @@ while [ "$#" -gt "0" ]; do
 	esac
 done
 debug "end of option processing, prependig options"
+
+# print some data
+case " $PRINT_DATA " in
+*' id '*)
+	debug "acting on --print-id"
+	echo "${ENTRY_ID}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+	;;
+esac
+case " $PRINT_DATA " in
+*' path '*)
+	debug "acting on --print-path"
+	# remove /./ delimiter
+	case "${ENTRY_PATH}" in
+	*'/./'*) ENTRY_PATH=${ENTRY_PATH%%/./*}/${ENTRY_PATH##*/./} ;;
+	esac
+	echo "${ENTRY_PATH}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+	;;
+esac
+case " $PRINT_DATA " in
+*' content '*)
+	debug "acting on --print-content"
+	while IFS='' read -r line; do
+		printf '%s\n' "$line"
+	done < "${ENTRY_PATH}"
+	;;
+esac
+
+# early bail out in some print modes
+case " $PRINT_DATA " in
+'  ' | *' cmd '*) true ;;
+*) exit 0 ;;
+esac
 
 # option prepend
 if [ "$#" -gt 0 ] && [ -n "$EXECARG" ]; then
@@ -1230,6 +1321,27 @@ case "$TEST_MODE" in
 true)
 	printf '%s\n' 'Command and arguments:'
 	printf '  >%s<\n' "$@"
+	exit 0
+	;;
+esac
+
+case " $PRINT_DATA " in
+*' cmd '*)
+	debug "acting on --print-cmd"
+	first=true
+	for arg in "$@"; do
+		case "$first" in
+		true)
+			printf '%s' "$arg"
+			first=false
+			;;
+		false) printf "${PRINT_DELIMITER:-\n}%s" "$arg" ;;
+		esac
+	done
+	# if delimiter is a newline, terminate another one
+	case "${PRINT_DELIMITER:-\n}" in
+	'\n') echo ;;
+	esac
 	exit 0
 	;;
 esac

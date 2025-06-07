@@ -29,6 +29,35 @@ along with any unsupported dashed option given before unambiguous command.
 It is assumed that the emulator handles command line after the execution
 argument *as is* (preserved separate arguments).
 
+# OPTIONS
+
+Monolithic options starting with "*--*" are used to modify behavior of terminal
+(if supported by terminal and its entry):
+
+- *--app-id=*_app\_id_: set app-id (Wayland) or class (X11).
+- *--title=*_title_: set tile of terminal.
+- *--dir=*_workdir_: set workdir of terminal.
+- *--hold*: instruct terminal to hold after command ends.
+
+Options for printing data instead of executing terminal:
+
+- *--print-id*: print selected Desktop Entry ID. Action is appended delimited
+  by "*:*".
+- *--print-path*: print path to selected Desktop Entry. Action is appended
+  delimited by "*:*".
+- *--print-content*: print content of selected Desktop Entry. Conflicts with
+  *--print-cmd*.
+  executing.
+- *--print-cmd*[*=*_printf_sequence_]: print resulting command line, delimited by
+  given printf sequence, "*\\n*" by default. If sequence is "*\\n*", output is
+  also terminated with newline. Conflicts with *--print-content*.
+
+Selected data is printed in order:
+
+- id
+- path
+- content or cmd
+
 # CONFIGURATION
 
 Preferred terminals are configured by listing them in config files
