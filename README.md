@@ -219,17 +219,21 @@ The resulting command is executed without forking.
   by `:`.
 - `--print-path`: print absolute path to selected Desktop Entry. Action is
   appended delimited by `:`.
-- `--print-content`: print content of selected Desktop Entry. Conflicts with
-  `--print-cmd`.
+- `--print-content`: print content of selected Desktop Entry.
 - `--print-cmd[=printf_sequence]`: print resulting command line, delimited by
-  given printf sequence, `\n` by default. If sequence is `\n`, output is also
-  terminated with newline. Conflicts with `--print-content`.
+  given printf sequence, `\n` by default. If sequence is `\n`, command output
+  is terminated with newline.
+- `--print-delimiter=printf_sequence`: printf sequence to be used as the
+  delimiter between multiple requested print statements, `\n` by default. If
+  sequence is `\n`, overall output is terminated with a newline (without
+  duplication in case command output already terminated on a newline).
 
 Depending on selected data options, data is returned in the following order:
 
 - id
 - path
-- content or cmd
+- content
+- cmd
 
 ## Limitations and compliance of terminals
 

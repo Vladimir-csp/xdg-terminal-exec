@@ -1,4 +1,5 @@
 #!/bin/sh
+
 # Default Terminal Execution Utility
 # Reference implementation of proposed Default Terminal Execution Specification
 # https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3
@@ -54,10 +55,83 @@ check_bool() {
 
 # Utility function to print debug messages to stderr (or not)
 if check_bool "${DEBUG-0}"; then
-	debug() { printf 'D: %s\n' "$@" >&2; }
+	debug() {
+		# print each arg at new line, prefix each printed line with 'D: '
+		while IFS='' read -r debug_line; do
+			printf 'D: %s\n' "$debug_line"
+		done <<- EOF >&2
+			$(printf '%s\n' "$@")
+		EOF
+	}
 else
 	debug() { :; }
 fi
+
+# builtin stdin cat
+shcat() {
+	while IFS='' read -r line; do
+		printf '%s\n' "$line"
+	done
+}
+
+usage() {
+	shcat <<- EOF
+		Usage:
+		  $SELF_NAME [options] [--] [command [arguments ...]]
+	EOF
+}
+
+help() {
+	shcat <<- EOF
+		$SELF_NAME - Shell-based default terminal launcher.
+
+		Implementation of the proposed Default Terminal Specification.
+
+		$(usage)
+
+		Launches given command in default terminal, or launches default terminal.
+
+		Options for modifying terminal behavior (if supported by terminals's
+		entry):
+
+		  --app-id=app-id	set app-id (Wayland) or window class (X11)
+		  --title=title		set tile of terminal.
+		  --dir=workdir		set workdir of terminal.
+		  --hold		instruct terminal to hold after command ends.
+
+		Options for printing data instead of executing terminal:
+
+		  --print-id
+		  	print selected Desktop Entry ID. Action is appended delimited
+		  	by ":".
+
+		  --print-path
+		  	print path to selected Desktop Entry. Action is appended
+		  	delimited by ":".
+
+		  --print-content
+		  	print content of selected Desktop Entry. Conflicts with --print-cmd.
+
+		  --print-cmd[=printf_sequence]
+		  	print resulting command line, delimited by given printf sequence,
+		  	"\\n" by default. If sequence is "\\n", output is also terminated with
+		  	a newline.
+
+		  --print-delimiter=printf_sequence
+		  	printf sequence to be used as the delimiter between multiple requested
+		  	print statements, "\\n" by default. If sequence is "\\n", output is
+		  	also terminated with a newline.
+
+		Configuration:
+
+		Preferred terminals are configured by listing their Desktop Entry IDs
+		in config files named "[\${desktop}-]xdg-terminals.list" placed in XDG Config
+		hierarchy. Where "\${desktop}" is a lowercased string that is matched
+		(case-insensitively) against items of "\${XDG_CURRENT_DESKTOP}".
+
+		See "man $SELF_NAME" for more details.
+	EOF
+}
 
 # Populates global constants and lists for later use and iteration
 make_paths() {
@@ -91,7 +165,7 @@ make_paths() {
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
 	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
 
-	debug "paths:" "CONFIGS=${CONFIGS}" "APPLICATIONS_DIRS=${APPLICATIONS_DIRS}"
+	debug "paths:" "  CONFIGS=${CONFIGS}" "  APPLICATIONS_DIRS=${APPLICATIONS_DIRS}"
 }
 # Mask IFS withing function to allow temporary changes
 alias make_paths='IFS= make_paths'
@@ -593,10 +667,7 @@ de_tokenize_exec() {
 		;;
 	esac
 	# shellcheck disable=SC2086
-	debug "tokenizer ended:" "$(
-		IFS=$USEP
-		printf 'D:     >%s<\n' $EXEC_USEP
-	)"
+	debug "tokenizer ended:" "$(IFS=$USEP; printf '  >%s<\n' $EXEC_USEP)"
 }
 
 de_strip_fields() {
@@ -1033,6 +1104,15 @@ get_default_execarg() {
 	debug "using default TerminalArgExec '-e' for '$check_entry'"
 }
 
+# print help and exit if there's -h|--help before --
+args=";;$(printf '%s;;' "$@")"
+case "${args%%';;--;;'*};;" in
+*';;-h;;'* | *';;--help;;'*)
+	help
+	exit 0
+	;;
+esac
+
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
 
@@ -1112,6 +1192,8 @@ DIRVAL=''
 HOLD=false
 TEST_MODE=false
 PRINT_DATA=
+PRINT_DELIMITER='\n'
+PRINT_CMD_DELIMITER='\n'
 while [ "$#" -gt "0" ]; do
 	case "$1" in
 	--)
@@ -1174,30 +1256,31 @@ while [ "$#" -gt "0" ]; do
 		;;
 	--print-content)
 		debug "found option $1"
-		case " $PRINT_DATA " in
-		*" cmd "*)
-			error "'--print-content' is incompatible with '--print-cmd'!"
-			exit 1
-			;;
-		esac
 		PRINT_DATA="$PRINT_DATA content"
 		debug "set PRINT_DATA=$PRINT_DATA"
 		shift
 		;;
-	--print-cmd | --print-cmd=*)
+	--print-cmd)
 		debug "found option $1"
-		case " $PRINT_DATA " in
-		*" content "*)
-			error "'--print-cmd' is incompatible with '--print-content'!"
-			exit 1
-			;;
-		esac
 		PRINT_DATA="$PRINT_DATA cmd"
+		debug "set PRINT_DATA=$PRINT_DATA"
+		shift
+		;;
+	--print-cmd=*)
+		debug "found option $1"
+		PRINT_DATA="$PRINT_DATA cmd"
+		IFS='=' read -r _arg PRINT_CMD_DELIMITER <<- EOF
+			$1
+		EOF
+		debug "set PRINT_DATA=$PRINT_DATA" "set PRINT_CMD_DELIMITER=$PRINT_CMD_DELIMITER"
+		shift
+		;;
+	--print-delimiter=*)
+		debug "found option $1"
 		IFS='=' read -r _arg PRINT_DELIMITER <<- EOF
 			$1
 		EOF
-		PRINT_DELIMITER=${PRINT_DELIMITER:-'\n'}
-		debug "set PRINT_DATA=$PRINT_DATA" "set PRINT_DELIMITER=$PRINT_DELIMITER"
+		debug "set PRINT_DELIMITER=$PRINT_DELIMITER"
 		shift
 		;;
 	[!-]*)
@@ -1213,35 +1296,65 @@ done
 debug "end of option processing, prependig options"
 
 # print some data
+PRINT_FIRST=true
 case " $PRINT_DATA " in
 *' id '*)
 	debug "acting on --print-id"
-	echo "${ENTRY_ID}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+
+	printf '%s' "${ENTRY_ID}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+
+	PRINT_FIRST=false
 	;;
 esac
 case " $PRINT_DATA " in
 *' path '*)
 	debug "acting on --print-path"
+
 	# remove /./ delimiter
 	case "${ENTRY_PATH}" in
 	*'/./'*) ENTRY_PATH=${ENTRY_PATH%%/./*}/${ENTRY_PATH##*/./} ;;
 	esac
-	echo "${ENTRY_PATH}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+
+	case "$PRINT_FIRST" in
+	false) printf '%b' "$PRINT_DELIMITER" ;;
+	esac
+
+	printf '%s' "${ENTRY_PATH}${ENTRY_ACTION:+:}${ENTRY_ACTION}"
+
+	PRINT_FIRST=false
 	;;
 esac
 case " $PRINT_DATA " in
 *' content '*)
 	debug "acting on --print-content"
-	while IFS='' read -r line; do
-		printf '%s\n' "$line"
-	done < "${ENTRY_PATH}"
+
+	case "$PRINT_FIRST" in
+	false) printf '%b' "$PRINT_DELIMITER" ;;
+	esac
+
+	shcat < "${ENTRY_PATH}"
+
+	PRINT_FIRST=false
 	;;
 esac
 
 # early bail out in some print modes
 case " $PRINT_DATA " in
-'  ' | *' cmd '*) true ;;
-*) exit 0 ;;
+'  ' | *' cmd '*)
+	# more stuff to do, continue
+	true
+	;;
+*' content '*)
+	# content already has newline at the end, just exit
+	exit 0
+	;;
+*)
+	# terminate with newline if delimiter is newline
+	case "$PRINT_DELIMITER" in
+	'\n') printf '%b' '\n' ;;
+	esac
+	exit 0
+	;;
 esac
 
 # option prepend
@@ -1328,20 +1441,25 @@ esac
 case " $PRINT_DATA " in
 *' cmd '*)
 	debug "acting on --print-cmd"
+
+	case "$PRINT_FIRST" in
+	false) printf '%b' "$PRINT_DELIMITER" ;;
+	esac
+
 	first=true
 	for arg in "$@"; do
 		case "$first" in
-		true)
-			printf '%s' "$arg"
-			first=false
-			;;
-		false) printf "${PRINT_DELIMITER:-\n}%s" "$arg" ;;
+		true) first=false ;;
+		false) printf '%b' "${PRINT_CMD_DELIMITER:-\n}" ;;
 		esac
+		printf '%s' "$arg"
 	done
-	# if delimiter is a newline, terminate another one
-	case "${PRINT_DELIMITER:-\n}" in
-	'\n') echo ;;
-	esac
+
+	# if either delimiter is a newline, terminate with another one
+	if [ "${PRINT_CMD_DELIMITER}" = '\n' ] || { [ "$PRINT_FIRST" = "false" ] && [ "$PRINT_DELIMITER" = '\n' ]; }; then
+		printf '%b' '\n'
+	fi
+
 	exit 0
 	;;
 esac

@@ -47,16 +47,20 @@ Options for printing data instead of executing terminal:
   delimited by "*:*".
 - *--print-content*: print content of selected Desktop Entry. Conflicts with
   *--print-cmd*.
-  executing.
 - *--print-cmd*[*=*_printf_sequence_]: print resulting command line, delimited by
   given printf sequence, "*\\n*" by default. If sequence is "*\\n*", output is
-  also terminated with newline. Conflicts with *--print-content*.
+  also terminated with a newline.
+- *--print-delimiter=*_printf_sequence_: printf sequenc to be used as the
+  delimiterprint between multiple requested statements, "*\\n*" by default.
+  If sequence is "*\\n*", overall output is also terminated with a newline
+  (without duplication in case command output already terminated on a newline).
 
 Selected data is printed in order:
 
 - id
 - path
-- content or cmd
+- content
+- cmd
 
 # CONFIGURATION
 
