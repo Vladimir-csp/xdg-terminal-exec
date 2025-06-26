@@ -1464,4 +1464,9 @@ case " $PRINT_DATA " in
 	;;
 esac
 
+if [ -z "$DIRARG" ] && [ -n "$DIRVAL" ]; then
+	debug "no X-TerminalArgDir in entry, changing dir to '$DIRVAL'"
+	cd "$DIRVAL"
+fi
+
 exec "$@"

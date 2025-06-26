@@ -203,7 +203,11 @@ delimited by `=`.
 - `--hold`
 
 Requested options then translated into arguments according to the keys existing
-in the terminal's Desktop Entry (or discarded otherwise).
+in the terminal's Desktop Entry (or discarded otherwise). If `--dir=` option is
+given, but terminal's entry lacks `X-TerminalArgDir=` key, implementation should
+instead change dir before executing terminal.
+
+### Execution argument and Execution
 
 If a command (with or witout its arguments) is given, and `TerminalArgExec=` key
 is not explicitly empty, then the value `TerminalArgExec=` (defaulting to `-e`)
