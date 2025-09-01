@@ -101,33 +101,33 @@ help() {
 		Options for modifying terminal behavior (if supported by terminals's
 		entry):
 
-		  --app-id=app-id	set app-id (Wayland) or window class (X11)
-		  --title=title		set tile of terminal.
-		  --dir=workdir		set workdir of terminal.
-		  --hold		instruct terminal to hold after command ends.
+		  --app-id=app-id    set app-id (Wayland) or window class (X11)
+		  --title=title      set tile of terminal.
+		  --dir=workdir      set workdir of terminal.
+		  --hold             instruct terminal to hold after command ends.
 
 		Options for printing data instead of executing terminal:
 
 		  --print-id
-		  	print selected Desktop Entry ID. Action is appended delimited
-		  	by ":".
+		      print selected Desktop Entry ID. Action is appended delimited
+		      by ":".
 
 		  --print-path
-		  	print path to selected Desktop Entry. Action is appended
-		  	delimited by ":".
+		      print path to selected Desktop Entry. Action is appended
+		      delimited by ":".
 
 		  --print-content
-		  	print content of selected Desktop Entry. Conflicts with --print-cmd.
+		      print content of selected Desktop Entry. Conflicts with --print-cmd.
 
 		  --print-cmd[=printf_sequence]
-		  	print resulting command line, delimited by given printf sequence,
-		  	"\\n" by default. If sequence is "\\n", output is also terminated with
-		  	a newline.
+		      print resulting command line, delimited by given printf sequence,
+		      "\\n" by default. If sequence is "\\n", output is also terminated with
+		      a newline.
 
 		  --print-delimiter=printf_sequence
-		  	printf sequence to be used as the delimiter between multiple requested
-		  	print statements, "\\n" by default. If sequence is "\\n", output is
-		  	also terminated with a newline.
+		      printf sequence to be used as the delimiter between multiple requested
+		      print statements, "\\n" by default. If sequence is "\\n", output is
+		      also terminated with a newline.
 
 		Configuration:
 
@@ -675,7 +675,10 @@ de_tokenize_exec() {
 		;;
 	esac
 	# shellcheck disable=SC2086
-	[ -z "$DEBUG" ] || debug "tokenizer ended:" "$(IFS=$USEP; printf '  >%s<\n' $EXEC_USEP)"
+	[ -z "$DEBUG" ] || debug "tokenizer ended:" "$(
+		IFS=$USEP
+		printf '  >%s<\n' $EXEC_USEP
+	)"
 }
 
 de_strip_fields() {
