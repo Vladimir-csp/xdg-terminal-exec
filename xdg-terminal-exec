@@ -32,10 +32,15 @@ N='
 SELF_NAME=${0##*/}
 
 # ASCII Record Separator for cache saving
-RSEP=$(printf '%b' '\036')
-
 # ASCII Unit Separator for Exec parsing
-USEP=$(printf '%b' '\037')
+# Carriage return for string expander
+{
+	read -r RSEP
+	read -r USEP
+	read -r CR
+} <<- EOF
+	$(printf '%b\n' '\036' '\037' '\r')
+EOF
 
 error() {
 	# Print messages to stderr
@@ -55,6 +60,7 @@ check_bool() {
 
 # Utility function to print debug messages to stderr (or not)
 if check_bool "${DEBUG-0}"; then
+	DEBUG=true
 	debug() {
 		# print each arg at new line, prefix each printed line with 'D: '
 		while IFS='' read -r debug_line; do
@@ -64,6 +70,7 @@ if check_bool "${DEBUG-0}"; then
 		EOF
 	}
 else
+	DEBUG=
 	debug() { :; }
 fi
 
@@ -173,6 +180,7 @@ alias make_paths='IFS= make_paths'
 gen_hash() {
 	# return md5 of custom string, XDG_CURRENT_DESKTOP and ls -LRl output for config and data paths
 	# md5 is 4x faster than sha*, and there is no need for cryptography here
+	# writes to NEW_HASH var
 	# shellcheck disable=SC2034
 	read -r hash _drop <<- EOH
 		$(
@@ -192,7 +200,7 @@ gen_hash() {
 	case "$hash" in
 	[0-9a-f]??????????????????????????????[0-9a-f])
 		debug "got fresh hash '$hash'"
-		echo "$hash"
+		NEW_HASH=$hash
 		return 0
 		;;
 	*)
@@ -257,7 +265,8 @@ read_cache() {
 				"dirarg=${cached_dirarg}" \
 				"holdarg=${cached_holdarg}" \
 				"exec_usep=${cached_exec_usep}"
-			HASH=$(gen_hash) || return 1
+			gen_hash || return 1
+			HASH=$NEW_HASH
 			if [ "$HASH" = "$cached_hash" ] && command -v "$cached_cmd" > /dev/null; then
 				debug "cache is actual"
 				EXEC_USEP=${cached_exec_usep}
@@ -289,11 +298,12 @@ save_cache() {
 	if check_bool "$CACHE_ENABLED"; then
 		[ ! -d "${XDG_CACHE_HOME}" ] && mkdir -p "${XDG_CACHE_HOME}"
 		if [ -z "${HASH-}" ]; then
-			HASH=$(gen_hash) || {
+			gen_hash || {
 				error "could not hash listing of files, removing '${CACHE_FILE}'"
 				rm -f "${CACHE_FILE}"
 				return 0
 			}
+			HASH=$NEW_HASH
 		fi
 		case "${HASH}${1}${EXECARG}${APPIDARG}${TITLEARG}${DIRARG}${HOLDARG}" in
 		"$N")
@@ -522,7 +532,7 @@ de_expand_str() {
 			debug "expander substituted tab"
 			;;
 		r*)
-			EXPANDED_STR=${EXPANDED_STR}$(printf '%b' '\r')
+			EXPANDED_STR=${EXPANDED_STR}$CR
 			exp_remainder=${exp_remainder#?}
 			debug "expander substituted caret return"
 			;;
@@ -667,7 +677,7 @@ de_tokenize_exec() {
 		;;
 	esac
 	# shellcheck disable=SC2086
-	debug "tokenizer ended:" "$(IFS=$USEP; printf '  >%s<\n' $EXEC_USEP)"
+	[ -z "$DEBUG" ] || debug "tokenizer ended:" "$(IFS=$USEP; printf '  >%s<\n' $EXEC_USEP)"
 }
 
 de_strip_fields() {
@@ -912,7 +922,7 @@ check_entry_key() {
 	'TryExec'*=*)
 		de_expand_str "$value"
 		debug "checking TryExec executable '$EXPANDED_STR'"
-		command -v "$(printf '%b' "$EXPANDED_STR")" > /dev/null || return 1
+		command -v "$EXPANDED_STR" > /dev/null || return 1
 		;;
 	'Hidden'*=*)
 		debug "checking boolean Hidden '$value'"
@@ -1067,7 +1077,8 @@ find_entry() {
 		if [ "$EXECARG_DEFINED" != "true" ]; then
 			# get (custom) default in compat mode
 			if check_bool "$EXECARG_COMPAT"; then
-				EXECARG=$(get_default_execarg "$entry_id")
+				get_default_execarg "$entry_id"
+				EXECARG=$DEFAULT_EXECARG
 			# discard entry in strict mode
 			else
 				continue
@@ -1087,31 +1098,34 @@ find_entry() {
 alias find_entry='IFS= find_entry'
 
 get_default_execarg() {
-	# based on entry_id ($1) return TerminalArgExec from EXECARG_DEFAULTS
-	check_entry=$1
-	while IFS=':' read -r entry_id execarg_default; do
-		case "$entry_id" in
-		"$check_entry")
-			printf '%s' "$execarg_default"
-			debug "custom default TerminalArgExec '$execarg_default' for '$check_entry'"
+	# based on entry_id ($1) get TerminalArgExec from EXECARG_DEFAULTS
+	# write to DEFAULT_EXECARG var
+	gde_check_entry=$1
+	while IFS=':' read -r gde_entry_id execarg_default; do
+		case "$gde_entry_id" in
+		"$gde_check_entry")
+			DEFAULT_EXECARG=$execarg_default
+			debug "custom default TerminalArgExec '$execarg_default' for '$gde_check_entry'"
 			return 0
 			;;
 		esac
 	done <<- EOF
 		$EXECARG_DEFAULTS
 	EOF
-	printf '%s' '-e'
-	debug "using default TerminalArgExec '-e' for '$check_entry'"
+	DEFAULT_EXECARG='-e'
+	debug "using default TerminalArgExec '-e' for '$gde_check_entry'"
 }
 
 # print help and exit if there's -h|--help before --
-args=";;$(printf '%s;;' "$@")"
-case "${args%%';;--;;'*};;" in
-*';;-h;;'* | *';;--help;;'*)
-	help
-	exit 0
-	;;
-esac
+for arg in "$@"; do
+	case "$arg" in
+	--) break ;;
+	-h | --help)
+		help
+		exit 0
+		;;
+	esac
+done
 
 ## globals
 LOWERCASE_XDG_CURRENT_DESKTOP=$(printf '%s' "${XDG_CURRENT_DESKTOP-}" | tr '[:upper:]' '[:lower:]')
