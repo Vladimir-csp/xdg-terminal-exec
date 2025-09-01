@@ -23,7 +23,7 @@
 set -euf
 
 # Store original IFS value, assumed to contain the default: <space><tab><newline>
-OIFS="$IFS"
+OIFS=$IFS
 # Newline, utility variable used throughout the script
 N='
 '
@@ -63,7 +63,7 @@ if check_bool "${DEBUG-0}"; then
 	DEBUG=true
 	debug() {
 		# print each arg at new line, prefix each printed line with 'D: '
-		while IFS='' read -r debug_line; do
+		while IFS= read -r debug_line; do
 			printf 'D: %s\n' "$debug_line"
 		done <<- EOF >&2
 			$(printf '%s\n' "$@")
@@ -76,7 +76,7 @@ fi
 
 # builtin stdin cat
 shcat() {
-	while IFS='' read -r line; do
+	while IFS= read -r line; do
 		printf '%s\n' "$line"
 	done
 }
@@ -148,34 +148,33 @@ make_paths() {
 	for dir in ${XDG_CONFIG_HOME:-"${HOME}/.config"}${IFS}${XDG_CONFIG_DIRS:-/etc/xdg}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
 		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
-			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/${desktop}-xdg-terminals.list
+			CONFIGS=${CONFIGS:+${CONFIGS}:}${dir%/}/${desktop}-xdg-terminals.list
 		done
-		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminals.list
+		CONFIGS=${CONFIGS:+${CONFIGS}:}${dir%/}/xdg-terminals.list
 	done
 
 	# append xdg-terminal-exec dirs in XDG_DATA_DIRS to config hierarchy for distro/upstream level defaults
 	for dir in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
 		for desktop in ${LOWERCASE_XDG_CURRENT_DESKTOP}; do
-			CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminal-exec/${desktop}-xdg-terminals.list
+			CONFIGS=${CONFIGS:+${CONFIGS}:}${dir%/}/xdg-terminal-exec/${desktop}-xdg-terminals.list
 		done
-		CONFIGS=${CONFIGS:+${CONFIGS}${IFS}}${dir%/}/xdg-terminal-exec/xdg-terminals.list
+		CONFIGS=${CONFIGS:+${CONFIGS}:}${dir%/}/xdg-terminal-exec/xdg-terminals.list
 	done
 
 	# Populate list of directories to search for entries in, in ascending order of preference
 	for dir in ${XDG_DATA_HOME:-${HOME}/.local/share}${IFS}${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
 		# Normalise base path and append the data subdirectory with a trailing '/'
-		APPLICATIONS_DIRS=${dir%/}/applications/${APPLICATIONS_DIRS:+${IFS}${APPLICATIONS_DIRS}}
+		APPLICATIONS_DIRS=${dir%/}/applications/${APPLICATIONS_DIRS:+:${APPLICATIONS_DIRS}}
 	done
 
 	# cache
 	XDG_CACHE_HOME=${XDG_CACHE_HOME:-"${HOME}/.cache"}
-	CACHE_FILE="${XDG_CACHE_HOME}/xdg-terminal-exec"
+	CACHE_FILE=${XDG_CACHE_HOME}/xdg-terminal-exec
 
+	IFS=$OIFS
 	debug "paths:" "  CONFIGS=${CONFIGS}" "  APPLICATIONS_DIRS=${APPLICATIONS_DIRS}"
 }
-# Mask IFS withing function to allow temporary changes
-alias make_paths='IFS= make_paths'
 
 gen_hash() {
 	# return md5 of custom string, XDG_CURRENT_DESKTOP and ls -LRl output for config and data paths
@@ -184,7 +183,7 @@ gen_hash() {
 	# shellcheck disable=SC2034
 	read -r hash _drop <<- EOH
 		$(
-			hash_paths="${CONFIGS}:${APPLICATIONS_DIRS}"
+			hash_paths=${CONFIGS}:${APPLICATIONS_DIRS}
 			{
 				# cache 'version', change to invalidate when format changes
 				echo 4
@@ -219,7 +218,7 @@ read_cache() {
 		line_limit=50
 		cached_exec_usep=
 		finished=0
-		while IFS='' read -r line; do
+		while IFS= read -r line; do
 			line_num=$((line_num + 1))
 			case "${line_num}" in
 			1) cached_hash=$line ;;
@@ -350,13 +349,14 @@ read_config_paths() {
 	# This way all IDs are already known, and in order of preference, before iterating over them
 	IFS=':'
 	for config_path in ${CONFIGS}; do
+		IFS=$OIFS
 		debug "reading config '$config_path'"
 		# Nonexistant file is not an error
 		[ -f "$config_path" ] || continue
 		# Let `read` trim leading/trailing whitespace from the line
-		while IFS="$OIFS" read -r line; do
+		while read -r line; do
 			#debug "read line '$line'"
-			case $line in
+			case "$line" in
 
 			# Catch directives first
 
@@ -420,7 +420,7 @@ read_config_paths() {
 					exclusion=${line%"$_line"}
 					line=$_line
 					;;
-				*) exclusion='' ;;
+				*) exclusion= ;;
 				esac
 				# consider only the first ':' as a delimiter
 				IFS=':' read -r entry_id action_id <<- EOL
@@ -463,8 +463,6 @@ read_config_paths() {
 		done < "$config_path"
 	done
 }
-# Mask IFS withing function to allow temporary changes
-alias read_config_paths='IFS= read_config_paths'
 
 replace() {
 	# takes $1, replaces $2 with $3
@@ -684,7 +682,7 @@ de_strip_fields() {
 	# Operates on $EXEC_USEP
 	# modifies according to args/fields
 	# no arguments, erase fields from $EXEC_USEP
-	exec_usep=''
+	exec_usep=
 	fu_found=false
 	IFS=$USEP
 	for arg in $EXEC_USEP; do
@@ -727,19 +725,17 @@ de_strip_fields() {
 	EXEC_USEP=$exec_usep
 	IFS=$OIFS
 }
-# Mask IFS withing function to allow temporary changes
-alias de_strip_fields='IFS= de_strip_fields'
 
 reset_keys() {
 	# init vars used in entry checks
-	IS_TERMINAL=''
-	EXEC_USEP=''
+	IS_TERMINAL=
+	EXEC_USEP=
 	EXECARG='-e'
 	EXECARG_DEFINED=false
-	APPIDARG=''
-	TITLEARG=''
-	DIRARG=''
-	HOLDARG=''
+	APPIDARG=
+	TITLEARG=
+	DIRARG=
+	HOLDARG=
 }
 
 # Find and map all desktop entry files from standardised paths into aliases
@@ -757,17 +753,17 @@ find_entry_paths() {
 	set -- "$@" -type f
 
 	# Append path conditions per directory
-	or_arg=''
+	or_arg=
 	for directory in $APPLICATIONS_DIRS; do
 		# Match full path with proper first character of entry ID and .desktop extension
 		# Reject paths with invalid characters in entry ID
 		set -- "$@" ${or_arg} '(' -path "$directory"'./[a-zA-Z0-9_]*.desktop' ! -path "$directory"'./*[^a-zA-Z0-9_./-]*' ')'
 		or_arg='-o'
 	done
+	IFS=$OIFS
 
 	# Loop through found entry paths and IDs
-	IFS=$N
-	while read -r entry_path && read -r entry_id; do
+	while IFS= read -r entry_path && IFS= read -r entry_id; do
 		# exclude entries based on EXCLUDED_ENTRY_IDS
 		if list_contains "$EXCLUDED_ENTRY_IDS" "$entry_id"; then
 			debug "entry '${entry_id}' was excluded from fallback"
@@ -789,8 +785,6 @@ find_entry_paths() {
 		)
 	EOE
 }
-# Mask IFS withing function to allow temporary changes
-alias find_entry_paths='IFS= find_entry_paths'
 
 # Check validity of a given entry key - value pair
 # Modifies following global variables:
@@ -798,11 +792,11 @@ alias find_entry_paths='IFS= find_entry_paths'
 # EXECARG : Execution argument for the terminal emulator.
 # IS_TERMINAL : Set if application has been categorized as a terminal emulator
 check_entry_key() {
-	key="$1"
-	value="$2"
-	action="$3"
-	read_exec="$4"
-	de_checks="$5"
+	key=$1
+	value=$2
+	action=$3
+	read_exec=$4
+	de_checks=$5
 
 	# Order of checks is important
 	case $key in
@@ -810,6 +804,7 @@ check_entry_key() {
 		debug "checking for 'TerminalEmulator' in Categories '$value'"
 		IFS=';'
 		for category in $value; do
+			IFS=$OIFS
 			[ "$category" = "TerminalEmulator" ] && {
 				IS_TERMINAL=true
 				return 0
@@ -826,6 +821,7 @@ check_entry_key() {
 		debug "checking for '$action' in Actions '$value'"
 		IFS=';'
 		for check_action in $value; do
+			IFS=$OIFS
 			if [ "$check_action" = "$action" ]; then
 				action_listed=true
 				return 0
@@ -846,6 +842,7 @@ check_entry_key() {
 		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
+				IFS=$OIFS
 				[ "$desktop" = "$target" ] && return 0
 			done
 		done
@@ -864,6 +861,7 @@ check_entry_key() {
 		for target in $value; do
 			IFS=':'
 			for desktop in ${XDG_CURRENT_DESKTOP-}; do
+				IFS=$OIFS
 				debug "checking NotShowIn match '$desktop'='$target'"
 				[ "$desktop" = "$target" ] && return 1
 			done
@@ -955,20 +953,18 @@ check_entry_key() {
 	esac
 	# By default unrecognised keys, empty lines and comments get ignored
 }
-# Mask IFS withing function to allow temporary changes
-alias check_entry_key='IFS= check_entry_key'
 
 # Read entry from given path
 read_entry_path() {
-	entry_path="$1"
-	entry_action="$2"
-	de_checks="$3"
+	entry_path=$1
+	entry_action=$2
+	de_checks=$3
 	read_exec=false
 	action_listed=false
 	# shellcheck disable=SC2016
 	debug "reading desktop entry '$entry_path'${entry_action:+ action '}$entry_action${entry_action:+'}"
 	# Let `read` trim leading/trailing whitespace from the line
-	while IFS="$OIFS" read -r line; do
+	while IFS=$OIFS read -r line; do
 		case $line in
 		# `There should be nothing preceding [the Desktop Entry group] in the desktop entry file but [comments]`
 		# if entry_action is not requested, allow reading Exec right away from the main group
@@ -1042,8 +1038,9 @@ validate_action_id() {
 find_entry() {
 	# for explicitly listed entries do not apply DE *ShowIn limits
 	de_checks=false
-	IFS="$N"
+	IFS=$N
 	for entry_id in ${ENTRY_IDS}${N}//fallback_start//${N}$FALLBACK_ENTRY_IDS; do
+		IFS=$OIFS
 		case "$entry_id" in
 		# entry has an action appended
 		*:*)
@@ -1058,7 +1055,7 @@ find_entry() {
 			continue
 			;;
 		# nullify action
-		*) entry_action='' ;;
+		*) entry_action= ;;
 		esac
 
 		debug "matching path for entry ID '$entry_id'"
@@ -1094,8 +1091,6 @@ find_entry() {
 	IFS=':' error "No valid terminal entry was found in:" ${APPLICATIONS_DIRS}
 	return 1
 }
-# Mask IFS withing function to allow temporary changes
-alias find_entry='IFS= find_entry'
 
 get_default_execarg() {
 	# based on entry_id ($1) get TerminalArgExec from EXECARG_DEFAULTS
@@ -1135,17 +1130,17 @@ EXECARG_COMPAT=${XTE_EXECARG_COMPAT-true}
 # flag reused in directive encounter
 EXECARG_COMPAT_CONFIGURED=${XTE_EXECARG_COMPAT-}
 
-EXEC_USEP=''
-EXPANDED_STR=''
-ENTRY_PATH=''
-ENTRY_ID=''
-ENTRY_ACTION=''
+EXEC_USEP=
+EXPANDED_STR=
+ENTRY_PATH=
+ENTRY_ID=
+ENTRY_ACTION=
 
 # this will receive proper value later
-APPLICATIONS_DIRS=''
+APPLICATIONS_DIRS=
 
 # this will be filled with values from /execarg_default:*:* directives
-EXECARG_DEFAULTS=''
+EXECARG_DEFAULTS=
 
 # this (re)sets vars to be filled from desktop entry
 reset_keys
@@ -1161,7 +1156,7 @@ CACHE_ENABLED=${XTE_CACHE_ENABLED-true}
 CACHE_CONFIGURED=${XTE_CACHE_ENABLED-}
 
 # HASH can be reused
-HASH=''
+HASH=
 
 if check_bool "${CACHE_ENABLED}" && read_cache; then
 	CACHE_USED=true
@@ -1171,15 +1166,15 @@ else
 
 	# All desktop entry ids in descending order of preference from *xdg-terminals.list configs,
 	# with duplicates removed
-	ENTRY_IDS=''
+	ENTRY_IDS=
 	# All desktop entry ids found in data dirs in descending order of preference,
 	# with duplicates (including those in $ENTRY_IDS) removed
-	FALLBACK_ENTRY_IDS=''
+	FALLBACK_ENTRY_IDS=
 
 	# Entry IDs excluded from fallback by '-entry.desktop' directives
-	EXCLUDED_ENTRY_IDS=''
+	EXCLUDED_ENTRY_IDS=
 	# Entry IDS included (exclusion prevented) by '+entry.desktop' directives
-	INCLUDED_ENTRY_IDS=''
+	INCLUDED_ENTRY_IDS=
 
 	# Modifies $ENTRY_IDS
 	read_config_paths
@@ -1187,9 +1182,9 @@ else
 	find_entry_paths
 
 	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
+	[ -z "$DEBUG" ] || IFS=$N debug ">     final entry ID list:" ${ENTRY_IDS} "^     end of final entry ID list"
 	# shellcheck disable=SC2086
-	IFS="$N" debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
+	[ -z "$DEBUG" ] || IFS=$N debug ">     final fallback entry ID list:" ${FALLBACK_ENTRY_IDS} "^     end of final fallback entry ID list"
 
 	# walk ID lists and find first applicable
 	find_entry || exit 1
@@ -1200,9 +1195,9 @@ debug ">     original args:" "$@" "^     end of original args" "EXEC_USEP=$EXEC_
 
 # process/discard options
 debug "option processing"
-APPIDVAL=''
-TITLEVAL=''
-DIRVAL=''
+APPIDVAL=
+TITLEVAL=
+DIRVAL=
 HOLD=false
 TEST_MODE=false
 PRINT_DATA=
