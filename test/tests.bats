@@ -243,3 +243,18 @@ newline'
 	assert_success
 	assert_output "default terminal"
 }
+
+@test "output of --print* options" {
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/preferred"
+	run "$XTE" --print-cmd=';;' --print-path --print-id --print-delimiter='\n\n' and 'custom arguments' 'with
+newline'
+	assert_success
+	assert_output <<- EOF
+		preferred-term.desktop
+		
+		${XDG_DATA_HOME}/applications/preferred-term.desktop
+		
+		echo;;preferred;;terminal;;-e;;and;;custom arguments;;with
+		newline
+	EOF
+}
