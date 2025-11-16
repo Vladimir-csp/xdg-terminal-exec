@@ -154,7 +154,7 @@ Cache file:
 *XTE_CACHE_ENABLED* (truthy or falsy value)
 	Enable or disable cache feature.
 
-*DEBUG* (truthy or falsy value)
+*XTE_DEBUG*, *DEBUG* (truthy or falsy value)
 	Print debug info to stderr.
 
 # EXTERNAL LINKS
