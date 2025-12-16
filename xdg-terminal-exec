@@ -767,15 +767,15 @@ find_entry_paths() {
 
 	# Loop through found entry paths and IDs
 	while IFS= read -r xte__entry_path && IFS= read -r xte__entry_id; do
+		# Entries are checked in ascending order of preference, so use last found if duplicate
+		# shellcheck disable=SC2139
+		alias "$xte__entry_id"="xte__entry_path='$xte__entry_path'"
+		debug "registered '$xte__entry_path' as entry '$xte__entry_id'"
 		# exclude entries based on XTE__EXCLUDED_ENTRY_IDS
 		if list_contains "$XTE__EXCLUDED_ENTRY_IDS" "$xte__entry_id"; then
 			debug "entry '${xte__entry_id}' was excluded from fallback"
 			continue
 		fi
-		# Entries are checked in ascending order of preference, so use last found if duplicate
-		# shellcheck disable=SC2139
-		alias "$xte__entry_id"="xte__entry_path='$xte__entry_path'"
-		debug "registered '$xte__entry_path' as entry '$xte__entry_id'"
 		# Add as a fallback ID regardles if it's a duplicate
 		XTE__FALLBACK_ENTRY_IDS=${xte__entry_id}${XTE__FALLBACK_ENTRY_IDS:+${XTE__LF}${XTE__FALLBACK_ENTRY_IDS}}
 		debug "added fallback ID '$xte__entry_id'"
