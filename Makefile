@@ -1,3 +1,5 @@
+.PHONY: all clean install-man install-bin install-conf install uninstall test
+
 SHELL = /bin/sh
 prefix ?= /usr/local
 exec_prefix ?= $(prefix)
@@ -6,41 +8,32 @@ datarootdir ?= $(prefix)/share
 mandir ?= $(datarootdir)/man
 man1dir ?= $(mandir)/man1
 
-xdg-terminal-exec.1:
-	@type scdoc >/dev/null || { echo "scdoc not found in PATH" >&2; exit 127; }
-	@type gzip >/dev/null || { echo "gzip not found in PATH" >&2; exit 127; }
-	scdoc < xdg-terminal-exec.1.scd | gzip -c > xdg-terminal-exec.1.gz
+%.1: %.1.scd
+	@type scdoc >/dev/null 2>&1 || { echo "scdoc not found in PATH" >&2; exit 127; }
+	scdoc < $< > $@
 
-.PHONY: all
 all: xdg-terminal-exec.1
 
-.PHONY: clean
 clean:
-	rm -f xdg-terminal-exec.1.gz
+	rm -f xdg-terminal-exec.1
 
-.PHONY: install-man
 install-man: xdg-terminal-exec.1
-	install -Dpm644 xdg-terminal-exec.1.gz -t $(man1dir)
+	install -Dpm644 xdg-terminal-exec.1 -t $(DESTDIR)$(man1dir)
 
-.PHONY: install-bin
-install-bin:
-	install -Dpm755 xdg-terminal-exec -t $(bindir)
+install-bin: xdg-terminal-exec
+	install -Dpm755 xdg-terminal-exec -t $(DESTDIR)$(bindir)
 
-.PHONY: install-conf
-install-conf:
-	install -Dpm644 xdg-terminals.list -t $(datarootdir)/xdg-terminal-exec
+install-conf: xdg-terminals.list
+	install -Dpm644 xdg-terminals.list -t $(DESTDIR)$(datarootdir)/xdg-terminal-exec
 
-.PHONY: install
 install: install-man install-bin install-conf
 
-.PHONY: uninstall
 uninstall:
-	rm -f $(bindir)/xdg-terminal-exec
-	rm -f $(man1dir)/xdg-terminal-exec.1.gz
-	rm -f $(datarootdir)/xdg-terminal-exec/xdg-terminals.list
-	rmdir $(datarootdir)/xdg-terminal-exec/
+	-rm -f $(DESTDIR)$(bindir)/xdg-terminal-exec
+	-rm -f $(DESTDIR)$(man1dir)/xdg-terminal-exec.1
+	-rm -f $(DESTDIR)$(datarootdir)/xdg-terminal-exec/xdg-terminals.list
+	-rm -fr $(DESTDIR)$(datarootdir)/xdg-terminal-exec
 
-.PHONY: test
 test:
-	@type bats >/dev/null || { echo "bats not found in PATH" >&2; exit 127; }
+	@type bats >/dev/null 2>&1 || { echo "bats not found in PATH" >&2; exit 127; }
 	test/tests.bats
