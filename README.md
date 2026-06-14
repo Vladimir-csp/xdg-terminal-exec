@@ -30,6 +30,10 @@ v0.11.0 introduced some important changes:
       arg defaults.
   - Build (note for packagers (!)): Added Makefile (Thanks, @quantenzitrone)
 
+Here is a list of known existing implementations:
+
+- [dgx-terminal-exec](https://git.sr.ht/~stacyharper/xdg-dgx): A bunch of re-implemented XDG utils, including xdg-terminal-exec.
+
 # Default Terminal Execution Specification
 
 This spec consists of three parts:
