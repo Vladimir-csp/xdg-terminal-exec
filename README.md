@@ -2,7 +2,7 @@
 
 Proposal for XDG Default Terminal Execution Specification and reference
 shell-based implementation. The proposal PR can be found
-[here](https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3/diffs).
+[here](https://gitlab.freedesktop.org/terminal-wg/specifications/-/merge_requests/3/diffs). See also a [list of other implementations](#other-implementations).
 
 (!) Please be advised that while this spec is in proposed state, backwards
 compatibility is maintained as best effort and is not guaranteed.
@@ -329,3 +329,9 @@ in argument "dequoting".
 
 This implementaton now does proper expansion, dequoting and command
 tokenization. It will invalidate entries that fail those rules.
+
+## Other implementations
+
+Here is a list of known existing implementations:
+
+- [dgx-terminal-exec](https://git.sr.ht/~stacyharper/xdg-dgx): A bunch of re-implemented XDG utils, including xdg-terminal-exec.
