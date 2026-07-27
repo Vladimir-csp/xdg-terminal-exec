@@ -27,6 +27,9 @@ XTE__OIFS=$IFS
 # Newline, utility variable used throughout the script
 XTE__LF='
 '
+# Locale-independent characters for bracket expressions
+XTE__ASCII_ALNUM=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
+XTE__ASCII_HEX=0123456789abcdef
 
 # name of executable
 XTE__SELF_NAME=${0##*/}
@@ -197,7 +200,7 @@ gen_hash() {
 		)
 	EOH
 	case "$xte__hash" in
-	[0-9a-f]??????????????????????????????[0-9a-f])
+	[${XTE__ASCII_HEX}]??????????????????????????????[${XTE__ASCII_HEX}])
 		debug "got fresh hash '$xte__hash'"
 		XTE__NEW_HASH=$xte__hash
 		return 0
@@ -412,7 +415,7 @@ read_config_paths() {
 			# I do not know of any terminal that starts with a number, but it's valid.
 
 			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
-			[a-zA-Z0-9_]* | [+-][a-zA-Z0-9_]*)
+			[${XTE__ASCII_ALNUM}_]* | [+-][${XTE__ASCII_ALNUM}_]*)
 				case "$xte__line" in
 				[+-]*)
 					# save and cut exclusion marker
@@ -760,7 +763,7 @@ find_entry_paths() {
 	for xte__directory in $XTE__APPLICATIONS_DIRS; do
 		# Match full path with proper first character of entry ID and .desktop extension
 		# Reject paths with invalid characters in entry ID
-		set -- "$@" ${xte__or_arg} '(' -path "$xte__directory"'./[a-zA-Z0-9_]*.desktop' ! -path "$xte__directory"'./*[^a-zA-Z0-9_./-]*' ')'
+		set -- "$@" ${xte__or_arg} '(' -path "${xte__directory}./[${XTE__ASCII_ALNUM}_]*.desktop" ! -path "${xte__directory}./*[^${XTE__ASCII_ALNUM}_./-]*" ')'
 		xte__or_arg='-o'
 	done
 	IFS=$XTE__OIFS
@@ -973,7 +976,7 @@ read_entry_path() {
 		# if xte__entry_action is not requested, allow reading Exec right away from the main group
 		'[Desktop Entry]'*) [ -z "$xte__entry_action" ] && xte__read_exec=true ;;
 		# A `Key=Value` pair
-		[a-zA-Z0-9-]*)
+		[${XTE__ASCII_ALNUM}-]*)
 			# Split value from pair
 			xte__value=${xte__line#*=}
 			# Remove all but leading spaces, and trim that from the value
@@ -1007,7 +1010,7 @@ validate_entry_id() {
 
 	case "$1" in
 	# invalid characters or degrees of emptiness
-	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
+	*[!${XTE__ASCII_ALNUM}_.-]* | *[!${XTE__ASCII_ALNUM}_.-] | [!${XTE__ASCII_ALNUM}_.-]* | [!${XTE__ASCII_ALNUM}_.-] | '' | .desktop)
 		debug "string not valid as Entry ID: '$1'"
 		return 1
 		;;
@@ -1028,7 +1031,7 @@ validate_action_id() {
 	# empty is ok
 	'') return 0 ;;
 	# invalid characters
-	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
+	*[!${XTE__ASCII_ALNUM}-]* | *[!${XTE__ASCII_ALNUM}-] | [!${XTE__ASCII_ALNUM}-]* | [!${XTE__ASCII_ALNUM}-])
 		debug "string not valid as Action ID: '$1'"
 		return 1
 		;;
