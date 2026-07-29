@@ -180,6 +180,11 @@ gen_hash() {
 	# return md5 of custom string, XDG_CURRENT_DESKTOP and ls -LRl output for config and data paths
 	# md5 is 4x faster than sha*, and there is no need for cryptography here
 	# writes to XTE__NEW_HASH var
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C gen_hash "$@"
+		return "$?"
+	fi
 	# shellcheck disable=SC2034
 	read -r xte__hash _drop <<- EOH
 		$(
@@ -347,6 +352,11 @@ list_contains() {
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C read_config_paths "$@"
+		return "$?"
+	fi
 	IFS=':'
 	for xte__config_path in ${XTE__CONFIGS}; do
 		IFS=$XTE__OIFS
@@ -782,7 +792,7 @@ find_entry_paths() {
 	done <<- EOE
 		$(
 			# Don't complain about nonexistent directories
-			find -L "$@" 2> /dev/null |
+			LC_ALL=C find -L "$@" 2> /dev/null |
 				# Print entry path and convert it into an ID and print that too
 				awk '{ print; sub(".*/[.]/", ""); gsub("/", "-"); print }'
 		)
@@ -959,6 +969,11 @@ check_entry_key() {
 
 # Read entry from given path
 read_entry_path() {
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C read_entry_path "$@"
+		return "$?"
+	fi
 	xte__entry_path=$1
 	xte__entry_action=$2
 	xte__de_checks=$3

@@ -155,6 +155,21 @@ assert_output() {
 	assert_output "specific terminal"
 }
 
+@test "finds entry with i in filename under Turkish collation" {
+	turkish_locale=$(locale -a | grep -Eim1 '^tr_TR\.utf-?8$') || skip "tr_TR.UTF-8 locale is unavailable"
+	unset LC_ALL
+	export LC_COLLATE=$turkish_locale
+	export XTE_CACHE_ENABLED=false
+	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/lists"
+	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
+	export XDG_DATA_HOME="$BATS_TEST_DIRNAME/data/desktop/lists"
+	export XDG_DATA_DIRS="$BATS_TEST_DIRNAME/data/default"
+	export XDG_CURRENT_DESKTOP=desktop
+	run "$XTE"
+	assert_success
+	assert_output "specific terminal"
+}
+
 @test "uses desktop-agnostic configuration when none is available" {
 	export XDG_CONFIG_HOME="$BATS_TEST_DIRNAME/config/desktop/lists"
 	export XDG_CONFIG_DIRS="$BATS_TEST_DIRNAME/config/default"
