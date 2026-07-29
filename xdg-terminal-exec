@@ -58,8 +58,8 @@ check_bool() {
 	esac
 }
 
-# Utility function to print debug messages to stderr (or not)
 if check_bool "${XTE_DEBUG-${DEBUG-0}}"; then
+	# Utility function to print debug messages to stderr (or not)
 	XTE__DEBUG=true
 	debug() {
 		# print each arg at new line, prefix each printed line with 'D: '
@@ -74,8 +74,8 @@ else
 	debug() { :; }
 fi
 
-# builtin stdin cat
 shcat() {
+	# builtin stdin cat
 	while IFS= read -r xte__line; do
 		printf '%s\n' "$xte__line"
 	done
@@ -140,8 +140,8 @@ help() {
 	EOF
 }
 
-# Populates global constants and lists for later use and iteration
 make_paths() {
+	# Populates global constants and lists for later use and iteration
 	IFS=':'
 
 	# Populate list of config files to read, in descending order of preference
@@ -348,8 +348,8 @@ list_contains() {
 	esac
 }
 
-# Parse all config files and populate $XTE__ENTRY_IDS with read desktop entry IDs
 read_config_paths() {
+	# Parse all config files and populate $XTE__ENTRY_IDS with read desktop entry IDs
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
 	if [ "${LC_ALL-}" != "C" ]; then
@@ -751,8 +751,8 @@ reset_keys() {
 	XTE__HOLDARG=
 }
 
-# Find and map all desktop entry files from standardised paths into aliases
 find_entry_paths() {
+	# Find and map all desktop entry files from standardised paths into aliases
 	debug "registering entries"
 
 	# Append application directory paths to be searched
@@ -799,12 +799,12 @@ find_entry_paths() {
 	EOE
 }
 
-# Check validity of a given entry key - value pair
-# Modifies following global variables:
-# XTE__EXEC_USEP : Program to execute, possibly with arguments, delimited by ASCII Unit Separator.
-# XTE__EXECARG : Execution argument for the terminal emulator.
-# XTE__IS_TERMINAL : Set if application has been categorized as a terminal emulator
 check_entry_key() {
+	# Check validity of a given entry key - value pair
+	# Modifies following global variables:
+	# XTE__EXEC_USEP : Program to execute, possibly with arguments, delimited by ASCII Unit Separator.
+	# XTE__EXECARG : Execution argument for the terminal emulator.
+	# XTE__IS_TERMINAL : Set if application has been categorized as a terminal emulator
 	xte__key=$1
 	xte__value=$2
 	xte__action=$3
@@ -967,8 +967,8 @@ check_entry_key() {
 	# By default unrecognised keys, empty lines and comments get ignored
 }
 
-# Read entry from given path
 read_entry_path() {
+	# Read entry from given path
 	if [ "${LC_ALL-}" != "C" ]; then
 		# re-call self with C locale
 		LC_ALL=C read_entry_path "$@"
@@ -1052,8 +1052,8 @@ validate_action_id() {
 	esac
 }
 
-# Loop through IDs and try to find a valid entry
 find_entry() {
+	# Loop through IDs and try to find a valid entry
 	# for explicitly listed entries do not apply DE *ShowIn limits
 	xte__de_checks=false
 	IFS=$XTE__LF
