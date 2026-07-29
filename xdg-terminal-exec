@@ -27,9 +27,6 @@ XTE__OIFS=$IFS
 # Newline, utility variable used throughout the script
 XTE__LF='
 '
-# Locale-independent characters for bracket expressions
-XTE__ASCII_ALNUM=abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
-XTE__ASCII_HEX=0123456789abcdef
 
 # name of executable
 XTE__SELF_NAME=${0##*/}
@@ -183,6 +180,11 @@ gen_hash() {
 	# return md5 of custom string, XDG_CURRENT_DESKTOP and ls -LRl output for config and data paths
 	# md5 is 4x faster than sha*, and there is no need for cryptography here
 	# writes to XTE__NEW_HASH var
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C gen_hash "$@"
+		return "$?"
+	fi
 	# shellcheck disable=SC2034
 	read -r xte__hash _drop <<- EOH
 		$(
@@ -200,7 +202,7 @@ gen_hash() {
 		)
 	EOH
 	case "$xte__hash" in
-	[${XTE__ASCII_HEX}]??????????????????????????????[${XTE__ASCII_HEX}])
+	[0-9a-f]??????????????????????????????[0-9a-f])
 		debug "got fresh hash '$xte__hash'"
 		XTE__NEW_HASH=$xte__hash
 		return 0
@@ -350,6 +352,11 @@ list_contains() {
 read_config_paths() {
 	# All config files are read immediatelly, rather than on demand, even if it's more IO intensive
 	# This way all IDs are already known, and in order of preference, before iterating over them
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C read_config_paths "$@"
+		return "$?"
+	fi
 	IFS=':'
 	for xte__config_path in ${XTE__CONFIGS}; do
 		IFS=$XTE__OIFS
@@ -415,7 +422,7 @@ read_config_paths() {
 			# I do not know of any terminal that starts with a number, but it's valid.
 
 			# Catch and validate potential entry ID with action ID (be graceful about an empty one)
-			[${XTE__ASCII_ALNUM}_]* | [+-][${XTE__ASCII_ALNUM}_]*)
+			[a-zA-Z0-9_]* | [+-][a-zA-Z0-9_]*)
 				case "$xte__line" in
 				[+-]*)
 					# save and cut exclusion marker
@@ -763,7 +770,7 @@ find_entry_paths() {
 	for xte__directory in $XTE__APPLICATIONS_DIRS; do
 		# Match full path with proper first character of entry ID and .desktop extension
 		# Reject paths with invalid characters in entry ID
-		set -- "$@" ${xte__or_arg} '(' -path "${xte__directory}./[${XTE__ASCII_ALNUM}_]*.desktop" ! -path "${xte__directory}./*[^${XTE__ASCII_ALNUM}_./-]*" ')'
+		set -- "$@" ${xte__or_arg} '(' -path "$xte__directory"'./[a-zA-Z0-9_]*.desktop' ! -path "$xte__directory"'./*[^a-zA-Z0-9_./-]*' ')'
 		xte__or_arg='-o'
 	done
 	IFS=$XTE__OIFS
@@ -785,7 +792,7 @@ find_entry_paths() {
 	done <<- EOE
 		$(
 			# Don't complain about nonexistent directories
-			find -L "$@" 2> /dev/null |
+			LC_ALL=C find -L "$@" 2> /dev/null |
 				# Print entry path and convert it into an ID and print that too
 				awk '{ print; sub(".*/[.]/", ""); gsub("/", "-"); print }'
 		)
@@ -962,6 +969,11 @@ check_entry_key() {
 
 # Read entry from given path
 read_entry_path() {
+	if [ "${LC_ALL-}" != "C" ]; then
+		# re-call self with C locale
+		LC_ALL=C read_entry_path "$@"
+		return "$?"
+	fi
 	xte__entry_path=$1
 	xte__entry_action=$2
 	xte__de_checks=$3
@@ -976,7 +988,7 @@ read_entry_path() {
 		# if xte__entry_action is not requested, allow reading Exec right away from the main group
 		'[Desktop Entry]'*) [ -z "$xte__entry_action" ] && xte__read_exec=true ;;
 		# A `Key=Value` pair
-		[${XTE__ASCII_ALNUM}-]*)
+		[a-zA-Z0-9-]*)
 			# Split value from pair
 			xte__value=${xte__line#*=}
 			# Remove all but leading spaces, and trim that from the value
@@ -1010,7 +1022,7 @@ validate_entry_id() {
 
 	case "$1" in
 	# invalid characters or degrees of emptiness
-	*[!${XTE__ASCII_ALNUM}_.-]* | *[!${XTE__ASCII_ALNUM}_.-] | [!${XTE__ASCII_ALNUM}_.-]* | [!${XTE__ASCII_ALNUM}_.-] | '' | .desktop)
+	*[!a-zA-Z0-9_.-]* | *[!a-zA-Z0-9_.-] | [!a-zA-Z0-9_.-]* | [!a-zA-Z0-9_.-] | '' | .desktop)
 		debug "string not valid as Entry ID: '$1'"
 		return 1
 		;;
@@ -1031,7 +1043,7 @@ validate_action_id() {
 	# empty is ok
 	'') return 0 ;;
 	# invalid characters
-	*[!${XTE__ASCII_ALNUM}-]* | *[!${XTE__ASCII_ALNUM}-] | [!${XTE__ASCII_ALNUM}-]* | [!${XTE__ASCII_ALNUM}-])
+	*[!a-zA-Z0-9-]* | *[!a-zA-Z0-9-] | [!a-zA-Z0-9-]* | [!a-zA-Z0-9-])
 		debug "string not valid as Action ID: '$1'"
 		return 1
 		;;
