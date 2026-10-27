@@ -1453,8 +1453,11 @@ IFS=$XTE__OIFS
 debug ">     final args:" "$@" "^     end of final args"
 
 if [ "$XTE__CACHE_USED" = "false" ]; then
-	# saves or removes cache, forked out of the way
-	save_cache "$1" &
+	# saves or removes cache, double-forked out of the way
+	(
+		save_cache "$1" &
+		exit
+	)
 fi
 
 case "$XTE__TEST_MODE" in
